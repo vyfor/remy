@@ -18,6 +18,12 @@ in the movie, **remy** is the little rat who hides under chef linguini's hat, pu
 - focus
 - overlays
 
+## usage
+
+```toml
+remy-tui = "0.0.1"
+```
+
 ## examples
 
 ```rs
