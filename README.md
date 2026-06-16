@@ -1,6 +1,6 @@
 # 🐀 remy
 
-remy is an opinionated, reactive framework for **ratatui** -- a rust crate for cooking up terminal user interfaces. remy is a work in progress.
+remy is an opinionated, reactive framework for **[ratatui](https://ratatui.rs)** -- a rust crate for cooking up terminal user interfaces. remy is a work in progress.
 
 ## why the name
 
