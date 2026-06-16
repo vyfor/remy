@@ -8,6 +8,7 @@ description.workspace = true
 categories.workspace = true
 repository.workspace = true
 keywords.workspace = true
+readme = "../../README.md"
 
 [dependencies]
 tokio = { workspace = true }
