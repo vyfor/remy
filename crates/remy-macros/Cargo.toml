@@ -2,6 +2,12 @@
 name = "remy-macros"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description.workspace = true
+categories.workspace = true
+repository.workspace = true
+keywords.workspace = true
 
 [lib]
 proc-macro = true
