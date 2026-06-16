@@ -1,0 +1,15 @@
+[package]
+name = "remy-tui"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "remy"
+
+[dependencies]
+remy-core = { workspace = true }
+remy-macros = { workspace = true }
+tokio = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+linkme = { workspace = true }
