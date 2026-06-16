@@ -4,6 +4,7 @@ members = [
     "crates/remy",
     "crates/remy-core",
     "crates/remy-macros",
+    "examples/counter"
 ]
 
 [workspace.package]
