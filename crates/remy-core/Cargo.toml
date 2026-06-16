@@ -1,0 +1,14 @@
+[package]
+name = "remy-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+linkme = { workspace = true }
+dashmap = { workspace = true }
+arc-swap = { workspace = true }
+futures-util = { workspace = true }
+smallvec = "1"
