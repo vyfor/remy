@@ -267,6 +267,7 @@ async fn run_loop<V: View>(
             runtime::cancel_stale_chord();
             runtime::Runtime::get().executor.sweep();
         } else {
+            crate::tracking::set_dirty_slots(dirty_slots.clone());
             crate::tracking::begin_render_tracking();
             runtime::begin_render();
             let draw = terminal.draw(|frame| {

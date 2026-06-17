@@ -1,4 +1,5 @@
 pub mod bus;
+pub mod cached;
 pub mod cx;
 pub mod effect;
 pub mod focus;
@@ -19,6 +20,7 @@ pub mod tracking;
 pub mod transaction;
 pub mod view;
 
+pub use cached::CachedView;
 pub use cx::Cx;
 pub use focus::{Focus, FocusGroup, FocusTarget};
 pub use framework::{Framework, Text};
