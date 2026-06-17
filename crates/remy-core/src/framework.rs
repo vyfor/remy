@@ -258,7 +258,10 @@ async fn run_loop<V: View>(
         runtime::begin_keys();
         runtime::begin_mouse_frame();
 
-        if !needs_render && !runtime::should_render(&dirty_slots) {
+        let needs_draw =
+            needs_render || runtime::take_redraw() || runtime::should_render(&dirty_slots);
+
+        if !needs_draw {
             runtime::finish_focus_frame();
             runtime::finish_mouse_frame();
             runtime::cancel_stale_chord();

@@ -15,7 +15,7 @@ pub fn next_slot_id() -> SlotId {
 }
 
 pub fn track_read(slot_id: SlotId) {
-    if let Some(_) = crate::tracking::current_effect() {
+    if crate::tracking::current_effect().is_some() {
         let rt = Runtime::get();
         rt.effects.track_read(slot_id);
         return;
