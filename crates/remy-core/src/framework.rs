@@ -10,9 +10,9 @@ use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
-use futures_util::{FutureExt, StreamExt};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use tokio::sync::mpsc;
 
 use crate::keyboard::{self, Chord, ChordPolicy, Flow, IntoFlow, Key, Keys};
 use crate::runtime;
@@ -247,26 +247,41 @@ async fn run_loop<V: View>(
     key_bindings: &Keys,
     input_handlers: &Inputs,
 ) -> io::Result<()> {
-    let mut terminal_events = EventStream::new();
+    // todo: possibly make adjustable?
     const EVENT_DRAIN_BUDGET: usize = 64;
+    // todo: make dynamic
+    const FRAME_BUDGET: Duration = Duration::from_millis(16);
     runtime::set_global_keys(key_bindings.clone());
-    let mut needs_render = true;
+
+    let (event_tx, mut event_rx) = mpsc::unbounded_channel::<io::Result<Event>>();
+    let event_stream = EventStream::new();
+    tokio::spawn(async move {
+        use futures_util::StreamExt;
+        let mut stream = event_stream;
+        while let Some(event) = stream.next().await {
+            if event_tx.send(event).is_err() {
+                break;
+            }
+        }
+    });
+
+    let mut force_render = true;
+    let mut frame_start = Instant::now();
 
     loop {
         let dirty_slots = runtime::apply_commits();
-        runtime::begin_focus_frame();
-        runtime::begin_keys();
-        runtime::begin_mouse_frame();
 
         let needs_draw =
-            needs_render || runtime::take_redraw() || runtime::should_render(&dirty_slots);
+            force_render || runtime::take_redraw() || runtime::should_render(&dirty_slots);
+        force_render = false;
 
-        if !needs_draw {
-            runtime::finish_focus_frame();
-            runtime::finish_mouse_frame();
-            runtime::cancel_stale_chord();
-            runtime::Runtime::get().executor.sweep();
-        } else {
+        if needs_draw {
+            frame_start = Instant::now();
+
+            runtime::begin_focus_frame();
+            runtime::begin_keys();
+            runtime::begin_mouse_frame();
+
             crate::tracking::set_dirty_slots(dirty_slots.clone());
             crate::tracking::begin_render_tracking();
             runtime::begin_render();
@@ -283,39 +298,54 @@ async fn run_loop<V: View>(
             draw?;
             runtime::finish_focus_frame();
             runtime::finish_mouse_frame();
-            runtime::cancel_stale_chord();
-            runtime::Runtime::get().executor.sweep();
         }
 
-        needs_render = false;
+        runtime::cancel_stale_chord();
+        runtime::Runtime::get().executor.sweep();
 
         if dispatch_timeout(key_bindings) == Flow::Quit {
             return Ok(());
         }
 
-        let sleep_for = sleep_duration();
+        let chord_was_pending = runtime::pending_chord().is_some();
+
+        let timeout = if needs_draw {
+            let frame_rem = FRAME_BUDGET.saturating_sub(frame_start.elapsed());
+            let chord =
+                runtime::chord_deadline().map(|d| d.saturating_duration_since(Instant::now()));
+            chord.unwrap_or(frame_rem).min(frame_rem)
+        } else {
+            runtime::chord_deadline()
+                .map(|d| d.saturating_duration_since(Instant::now()))
+                .unwrap_or(Duration::from_secs(10))
+        };
+
         let event = tokio::select! {
             biased;
-            event = terminal_events.next() => event.transpose()?,
+            event = event_rx.recv() => event,
             _ = runtime::dirty_notify().notified() => None,
-            _ = tokio::time::sleep(sleep_for) => None,
+            _ = tokio::time::sleep(timeout) => None,
         };
+
         if dispatch_timeout(key_bindings) == Flow::Quit {
             return Ok(());
+        }
+
+        if chord_was_pending && runtime::pending_chord().is_none() {
+            force_render = true;
         }
 
         if let Some(event) = event {
-            needs_render = true;
+            let event = event?;
+            force_render = true;
             if dispatch_event(event, key_bindings, input_handlers) == Flow::Quit {
                 return Ok(());
             }
             for _ in 0..EVENT_DRAIN_BUDGET {
-                let Some(event) = terminal_events.next().now_or_never() else {
+                let Some(event) = event_rx.try_recv().ok() else {
                     break;
                 };
-                let Some(event) = event.transpose()? else {
-                    break;
-                };
+                let event = event?;
                 if dispatch_event(event, key_bindings, input_handlers) == Flow::Quit {
                     return Ok(());
                 }
@@ -384,17 +414,6 @@ fn dispatch_mouse(event: MouseEvent, input_handlers: &Inputs) -> Flow {
     } else {
         input_handlers.mouse(event)
     }
-}
-
-fn sleep_duration() -> Duration {
-    const FRAME_SLEEP: Duration = Duration::from_millis(16);
-    runtime::chord_deadline()
-        .map(|deadline| {
-            deadline
-                .saturating_duration_since(Instant::now())
-                .min(FRAME_SLEEP)
-        })
-        .unwrap_or(FRAME_SLEEP)
 }
 
 fn dispatch_key(key: Key, global_bindings: &Keys) -> Flow {
