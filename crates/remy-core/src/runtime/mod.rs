@@ -9,10 +9,10 @@ use crate::effect::Effects;
 use crate::keyboard::Keys;
 use crate::mouse::Regions;
 use crate::scope::{Globals, Scope};
-use crate::state::Slots;
+use crate::state::{SlotId, Slots};
 use crate::tracking::OwnerId;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 mod batch;
@@ -58,8 +58,8 @@ pub use resource::{
     bump_resource_gen, current_resource_gen, has_resource_fetched, mark_resource_fetched,
 };
 pub use state::{
-    allocate_slot, apply_commits, commit_transaction, next_slot_id, read_current, track_read,
-    update_wake, write_wake,
+    allocate_slot, apply_commits, commit_transaction, flush_render_reads, next_slot_id,
+    read_current, should_render, track_read, update_wake, write_wake,
 };
 
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
@@ -86,6 +86,8 @@ pub struct Runtime {
     next_layer: AtomicU64,
     pub(crate) chord: Mutex<ChordState>,
     pub(crate) mouse: Mutex<Regions>,
+    rendered_slots: Mutex<HashSet<SlotId>>,
+    redraw_requested: AtomicBool,
 }
 
 impl Runtime {
@@ -112,6 +114,8 @@ impl Runtime {
             next_layer: AtomicU64::new(1),
             chord: Mutex::new(ChordState::default()),
             mouse: Mutex::new(Regions::default()),
+            rendered_slots: Mutex::new(HashSet::new()),
+            redraw_requested: AtomicBool::new(false),
         }
     }
 
@@ -144,6 +148,19 @@ fn init_stores() {
 
 pub fn dirty_notify() -> &'static Notify {
     &Runtime::get().dirty_notify
+}
+
+pub fn redraw() {
+    let rt = Runtime::get();
+    rt.redraw_requested
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    rt.dirty_notify.notify_one();
+}
+
+pub(crate) fn take_redraw() -> bool {
+    Runtime::get()
+        .redraw_requested
+        .swap(false, std::sync::atomic::Ordering::Relaxed)
 }
 
 pub fn begin_render() {

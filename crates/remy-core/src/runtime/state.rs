@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use crate::bus::{Commit, Op};
@@ -14,11 +15,14 @@ pub fn next_slot_id() -> SlotId {
 }
 
 pub fn track_read(slot_id: SlotId) {
-    if crate::tracking::current_effect().is_none() {
+    if crate::tracking::current_effect().is_some() {
+        let rt = Runtime::get();
+        rt.effects.track_read(slot_id);
         return;
     }
-    let rt = Runtime::get();
-    rt.effects.track_read(slot_id);
+    if crate::tracking::is_render_tracking() {
+        crate::tracking::record_render_read(slot_id);
+    }
 }
 
 pub fn read_current<T: 'static>(slot_id: SlotId) -> &'static T {
@@ -53,7 +57,7 @@ pub fn commit_transaction(commits: Vec<Commit>) {
     rt.dirty_notify.notify_one();
 }
 
-pub fn apply_commits() {
+pub fn apply_commits() -> Vec<SlotId> {
     let rt = Runtime::get();
     let commits = rt.commits.drain();
 
@@ -66,4 +70,20 @@ pub fn apply_commits() {
 
     let dirty_slots = rt.state.commit_all();
     rt.effects.run_slots(&dirty_slots);
+    dirty_slots
+}
+
+pub fn flush_render_reads() {
+    let reads = crate::tracking::drain_render_reads();
+    let slots: HashSet<SlotId> = reads.into_iter().collect();
+    *Runtime::get().rendered_slots.lock().unwrap() = slots;
+}
+
+pub fn should_render(dirty_slots: &[SlotId]) -> bool {
+    let rt = Runtime::get();
+    let rendered = rt.rendered_slots.lock().unwrap();
+    if rendered.is_empty() {
+        return true;
+    }
+    dirty_slots.iter().any(|s| rendered.contains(s))
 }

@@ -250,28 +250,44 @@ async fn run_loop<V: View>(
     let mut terminal_events = EventStream::new();
     const EVENT_DRAIN_BUDGET: usize = 64;
     runtime::set_global_keys(key_bindings.clone());
+    let mut needs_render = true;
 
     loop {
-        runtime::apply_commits();
+        let dirty_slots = runtime::apply_commits();
         runtime::begin_focus_frame();
         runtime::begin_keys();
         runtime::begin_mouse_frame();
 
-        runtime::begin_render();
-        let draw = terminal.draw(|frame| {
-            root.render(frame, frame.area());
-            let overlays = runtime::drain_overlays();
-            for entry in overlays {
-                (entry.render)(frame, entry.rect);
-            }
-        });
-        runtime::end_render();
-        draw?;
-        runtime::finish_focus_frame();
-        runtime::finish_mouse_frame();
-        runtime::cancel_stale_chord();
+        let needs_draw =
+            needs_render || runtime::take_redraw() || runtime::should_render(&dirty_slots);
 
-        runtime::Runtime::get().executor.sweep();
+        if !needs_draw {
+            runtime::finish_focus_frame();
+            runtime::finish_mouse_frame();
+            runtime::cancel_stale_chord();
+            runtime::Runtime::get().executor.sweep();
+        } else {
+            crate::tracking::begin_render_tracking();
+            runtime::begin_render();
+            let draw = terminal.draw(|frame| {
+                root.render(frame, frame.area());
+                let overlays = runtime::drain_overlays();
+                for entry in overlays {
+                    (entry.render)(frame, entry.rect);
+                }
+            });
+            runtime::end_render();
+            crate::tracking::end_render_tracking();
+            runtime::flush_render_reads();
+            draw?;
+            runtime::finish_focus_frame();
+            runtime::finish_mouse_frame();
+            runtime::cancel_stale_chord();
+            runtime::Runtime::get().executor.sweep();
+        }
+
+        needs_render = false;
+
         if dispatch_timeout(key_bindings) == Flow::Quit {
             return Ok(());
         }
@@ -288,6 +304,7 @@ async fn run_loop<V: View>(
         }
 
         if let Some(event) = event {
+            needs_render = true;
             if dispatch_event(event, key_bindings, input_handlers) == Flow::Quit {
                 return Ok(());
             }
