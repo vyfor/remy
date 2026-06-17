@@ -5,6 +5,7 @@ use dashmap::DashMap;
 use tokio::sync::Notify;
 
 use crate::bus::{Executor, Queue};
+use crate::cached::ComponentCache;
 use crate::effect::Effects;
 use crate::keyboard::Keys;
 use crate::mouse::Regions;
@@ -88,6 +89,8 @@ pub struct Runtime {
     pub(crate) mouse: Mutex<Regions>,
     rendered_slots: Mutex<HashSet<SlotId>>,
     redraw_requested: AtomicBool,
+    pub(crate) component_caches: DashMap<OwnerId, ComponentCache>,
+    pending_dirty: Mutex<Vec<SlotId>>,
 }
 
 impl Runtime {
@@ -116,6 +119,8 @@ impl Runtime {
             mouse: Mutex::new(Regions::default()),
             rendered_slots: Mutex::new(HashSet::new()),
             redraw_requested: AtomicBool::new(false),
+            component_caches: DashMap::new(),
+            pending_dirty: Mutex::new(Vec::new()),
         }
     }
 

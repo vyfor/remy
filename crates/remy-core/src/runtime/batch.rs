@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 
 use crate::effect::EffectId;
 
-use super::{Runtime, apply_commits};
+use super::Runtime;
 
 thread_local! {
     static BATCH_DEPTH: Cell<u32> = const { Cell::new(0) };
@@ -19,9 +19,6 @@ pub fn batch_enter() {
 
 pub fn batch_exit() {
     let prev = BATCH_DEPTH.with(|d| d.get());
-    if prev == 1 {
-        apply_commits();
-    }
     BATCH_DEPTH.with(|d| d.set(prev - 1));
     if prev == 1 {
         flush_batch();

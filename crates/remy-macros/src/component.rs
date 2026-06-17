@@ -74,11 +74,8 @@ fn is_cx(path: &Path) -> bool {
 
 pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
     if !attr.is_empty() {
-        return syn::Error::new_spanned(
-            attr,
-            "#[component] does not accept arguments",
-        )
-        .to_compile_error();
+        return syn::Error::new_spanned(attr, "#[component] does not accept arguments")
+            .to_compile_error();
     }
 
     let mut func: ItemFn = match parse2(input) {
@@ -112,7 +109,7 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
             #cx_binding
             let __res = { #(#existing_stmts)* };
             ::std::mem::drop(__active_guard);
-            __res
+            ::remy::core::CachedView::new(__owner_id, __res)
         }
     };
 

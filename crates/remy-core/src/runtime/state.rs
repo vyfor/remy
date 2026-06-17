@@ -70,7 +70,9 @@ pub fn apply_commits() -> Vec<SlotId> {
 
     let dirty_slots = rt.state.commit_all();
     rt.effects.run_slots(&dirty_slots);
-    dirty_slots
+    let mut pending = rt.pending_dirty.lock().unwrap();
+    pending.extend(dirty_slots);
+    pending.drain(..).collect()
 }
 
 pub fn flush_render_reads() {
