@@ -19,3 +19,10 @@ dashmap = { workspace = true }
 arc-swap = { workspace = true }
 futures-util = { workspace = true }
 smallvec = "1"
+
+[dev-dependencies]
+criterion = "0.8"
+
+[[bench]]
+name = "benchmark"
+harness = false
