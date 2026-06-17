@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use ratatui::layout::Rect;
 
-pub type OverlayRender = Box<dyn FnOnce(&mut ratatui::Frame, Rect)>;
+pub type OverlayRender = Box<dyn FnOnce(&mut ratatui::buffer::Buffer, Rect)>;
 
 pub struct OverlayEntry {
     pub rect: Rect,
@@ -19,4 +19,8 @@ pub fn push_overlay(rect: Rect, render: OverlayRender) {
 
 pub fn drain_overlays() -> Vec<OverlayEntry> {
     OVERLAYS.with(|o| std::mem::take(&mut *o.borrow_mut()))
+}
+
+pub fn overlay_rects() -> Vec<Rect> {
+    OVERLAYS.with(|o| o.borrow().iter().map(|e| e.rect).collect())
 }

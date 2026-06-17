@@ -1,9 +1,11 @@
 pub use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+pub use ratatui::layout::Position;
 pub use remy_core as core;
 pub use remy_core::batch;
 pub use remy_core::keyboard::quit;
 pub use remy_core::keyboard::{IntoBind, IntoFlow};
 pub use remy_core::runtime::Runtime;
+pub use remy_core::tracking::set_cursor_position;
 pub use remy_core::{
     Bind, BindKind, CachedView, Chord, ChordPolicy, Cx, Flow, Framework, Init, Key, Keys,
     LayerHandle, LayerId, Load, Memo, Mods, Owner, Pos, Proxy, Query, QueryOpts, Refresh, Region,
@@ -12,6 +14,15 @@ pub use remy_core::{
 };
 pub use remy_core::{INTENT_REGISTRY, STORE_REGISTRY};
 pub use remy_core::{bus, effect, runtime, tracking};
+
+// ratatui buffer does not provide a way to update cursor
+pub fn set_cursor(position: impl Into<Position>) {
+    set_cursor_position(Some(position.into()));
+}
+
+pub fn hide_cursor() {
+    set_cursor_position(None);
+}
 
 pub mod focus {
     pub use remy_core::focus::{

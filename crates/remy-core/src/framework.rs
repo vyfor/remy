@@ -12,6 +12,8 @@ use crossterm::terminal::{
 };
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 use tokio::sync::mpsc;
 
 use crate::keyboard::{self, Chord, ChordPolicy, Flow, IntoFlow, Key, Keys};
@@ -267,6 +269,8 @@ async fn run_loop<V: View>(
 
     let mut force_render = true;
     let mut frame_start = Instant::now();
+    let mut composition: Option<Buffer> = None;
+    let mut prev_overlays: Vec<Rect> = Vec::new();
 
     loop {
         let dirty_slots = runtime::apply_commits();
@@ -278,6 +282,30 @@ async fn run_loop<V: View>(
         if needs_draw {
             frame_start = Instant::now();
 
+            terminal.autoresize()?;
+            let area = {
+                let frame = terminal.get_frame();
+                frame.area()
+            };
+
+            runtime::set_canvas(area);
+
+            if composition.as_ref().map(|b| b.area) != Some(area) {
+                composition = Some(Buffer::empty(area));
+                crate::tracking::mark_cleared(area);
+            }
+
+            let cur_overlays: Vec<Rect> = runtime::overlay_rects();
+            for &prev in &prev_overlays {
+                let still_present = cur_overlays.contains(&prev);
+                if !still_present {
+                    crate::tracking::mark_cleared(prev);
+                }
+            }
+            prev_overlays.clear();
+
+            let comp = composition.as_mut().expect("what?");
+
             runtime::begin_focus_frame();
             runtime::begin_keys();
             runtime::begin_mouse_frame();
@@ -285,17 +313,33 @@ async fn run_loop<V: View>(
             crate::tracking::set_dirty_slots(dirty_slots.clone());
             crate::tracking::begin_render_tracking();
             runtime::begin_render();
-            let draw = terminal.draw(|frame| {
-                root.render(frame, frame.area());
-                let overlays = runtime::drain_overlays();
-                for entry in overlays {
-                    (entry.render)(frame, entry.rect);
-                }
-            });
+            root.render(comp, area);
+
+            let overlays = runtime::drain_overlays();
+            for entry in &overlays {
+                prev_overlays.push(entry.rect);
+            }
+            for entry in overlays {
+                (entry.render)(comp, entry.rect);
+            }
+
             runtime::end_render();
             crate::tracking::end_render_tracking();
             runtime::flush_render_reads();
-            draw?;
+            crate::tracking::take_cleared_areas();
+
+            let cursor_pos = crate::tracking::take_cursor_position();
+
+            {
+                let cur = terminal.current_buffer_mut();
+                if cur.area == comp.area {
+                    cur.content.clone_from_slice(&comp.content);
+                } else {
+                    *cur = comp.clone();
+                }
+            }
+
+            terminal.apply_buffer_with_cursor(cursor_pos)?;
             runtime::finish_focus_frame();
             runtime::finish_mouse_frame();
         }

@@ -1,4 +1,6 @@
+use remy::ratatui::buffer::Buffer;
 use remy::ratatui::layout::Rect;
+use remy::ratatui::prelude::Widget;
 use remy::ratatui::widgets::{Block, Borders, Paragraph};
 use remy::{Framework, State, View, component, intent, quit, state, store};
 
@@ -19,11 +21,11 @@ fn decrement() {
 
 #[component]
 fn App() -> impl View {
-    move |frame: &mut remy::ratatui::Frame, area: Rect| {
+    move |buf: &mut Buffer, area: Rect| {
         let widget = Paragraph::new(format!("count: {}", *counter::count))
             .block(Block::new().title("counter").borders(Borders::ALL));
 
-        frame.render_widget(widget, area);
+        widget.render(area, buf);
     }
 }
 

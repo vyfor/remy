@@ -4,15 +4,15 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 
 use crate::state::SlotId;
-use crate::tracking::OwnerId;
-use crate::tracking::{any_slot_dirty, pop_owner, push_owner};
+use crate::tracking::{clear_area, is_area_cleared, mark_cleared};
+use crate::tracking::{any_slot_dirty, pop_owner, push_owner, OwnerId};
 use crate::view::View;
 
 #[derive(Default)]
 pub struct ComponentCache {
     pub area: Option<Rect>,
-    pub buffer: Option<Buffer>,
-    pub tracked_slots: HashSet<SlotId>,
+    pub own_slots: HashSet<SlotId>,
+    pub child_slots: HashSet<SlotId>,
 }
 
 pub struct CachedView<V> {
@@ -27,51 +27,38 @@ impl<V: View> CachedView<V> {
 }
 
 impl<V: View> View for CachedView<V> {
-    fn render(&self, frame: &mut ratatui::Frame, area: Rect) {
+    fn render(&self, buf: &mut Buffer, area: Rect) {
         let rt = crate::runtime::Runtime::get();
         let entry = rt.component_caches.entry(self.owner_id).or_default();
 
-        let is_dirty = any_slot_dirty(&entry.tracked_slots);
-        let valid = entry.area == Some(area) && !is_dirty;
+        let own_dirty = any_slot_dirty(&entry.own_slots);
+        let child_dirty = any_slot_dirty(&entry.child_slots);
+        let was_wiped = is_area_cleared(area);
+        let area_unchanged = entry.area == Some(area);
 
-        if valid {
-            if let Some(buffer) = &entry.buffer {
-                let dst = frame.buffer_mut();
-                for y in 0..area.height {
-                    for x in 0..area.width {
-                        let src_cell = buffer.cell((x, y)).unwrap();
-                        let dst_cell = dst.cell_mut((area.x + x, area.y + y)).unwrap();
-                        *dst_cell = src_cell.clone();
-                    }
-                }
-            }
+        if !own_dirty && !child_dirty && !was_wiped && area_unchanged {
             return;
         }
 
         drop(entry);
 
+        if own_dirty || was_wiped {
+            clear_area(buf, area);
+            mark_cleared(area);
+        }
+
         let prev = crate::tracking::ACTIVE_OWNER.get();
         crate::tracking::ACTIVE_OWNER.set(Some(self.owner_id));
         push_owner();
 
-        self.view.render(frame, area);
+        self.view.render(buf, area);
 
-        let reads = pop_owner();
+        let frame = pop_owner();
         crate::tracking::ACTIVE_OWNER.set(prev);
-
-        let mut captured = Buffer::empty(Rect::new(0, 0, area.width, area.height));
-        let src = frame.buffer_mut();
-        for y in 0..area.height {
-            for x in 0..area.width {
-                let cell = src.cell((area.x + x, area.y + y)).unwrap();
-                let dst_cell = captured.cell_mut((x, y)).unwrap();
-                *dst_cell = cell.clone();
-            }
-        }
 
         let mut entry = rt.component_caches.entry(self.owner_id).or_default();
         entry.area = Some(area);
-        entry.buffer = Some(captured);
-        entry.tracked_slots = reads.iter().copied().collect();
+        entry.own_slots = frame.own.into_iter().collect();
+        entry.child_slots = frame.children.into_iter().collect();
     }
 }

@@ -2,6 +2,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 
 use dashmap::DashMap;
+use ratatui::layout::Rect;
 use tokio::sync::Notify;
 
 use crate::bus::{Executor, Queue};
@@ -54,7 +55,7 @@ pub use mouse::{
     add_mouse_region, begin_mouse_frame, dispatch_mouse_event, finish_mouse_frame,
     is_region_hovered,
 };
-pub use overlay::{drain_overlays, push_overlay};
+pub use overlay::{drain_overlays, overlay_rects, push_overlay};
 pub use resource::{
     bump_resource_gen, current_resource_gen, has_resource_fetched, mark_resource_fetched,
 };
@@ -91,6 +92,7 @@ pub struct Runtime {
     redraw_requested: AtomicBool,
     pub(crate) component_caches: DashMap<OwnerId, ComponentCache>,
     pending_dirty: Mutex<Vec<SlotId>>,
+    pub(crate) canvas: Mutex<Option<Rect>>,
 }
 
 impl Runtime {
@@ -121,6 +123,7 @@ impl Runtime {
             redraw_requested: AtomicBool::new(false),
             component_caches: DashMap::new(),
             pending_dirty: Mutex::new(Vec::new()),
+            canvas: Mutex::new(None),
         }
     }
 
@@ -184,4 +187,23 @@ pub fn is_rendering() -> bool {
     Runtime::get()
         .rendering
         .load(std::sync::atomic::Ordering::Relaxed)
+}
+
+pub(crate) fn set_canvas(area: Rect) {
+    let rt = Runtime::get();
+    if let Ok(mut guard) = rt.canvas.lock() {
+        *guard = Some(area);
+    }
+}
+
+pub fn invalidate_all() {
+    let rt = Runtime::get();
+    let area = rt
+        .canvas
+        .lock()
+        .ok()
+        .and_then(|guard| *guard)
+        .unwrap_or(Rect::new(0, 0, 0, 0));
+    crate::tracking::mark_cleared(area);
+    redraw();
 }
