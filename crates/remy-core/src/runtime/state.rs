@@ -77,15 +77,17 @@ pub fn apply_commits() -> Vec<SlotId> {
 
 pub fn flush_render_reads() {
     let reads = crate::tracking::drain_render_reads();
+    let rt = Runtime::get();
     let slots: HashSet<SlotId> = reads.into_iter().collect();
-    *Runtime::get().rendered_slots.lock().unwrap() = slots;
+    *rt.rendered_slots.lock().unwrap() = slots;
+    rt.has_rendered.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
 pub fn should_render(dirty_slots: &[SlotId]) -> bool {
     let rt = Runtime::get();
-    let rendered = rt.rendered_slots.lock().unwrap();
-    if rendered.is_empty() {
+    if !rt.has_rendered.load(std::sync::atomic::Ordering::Relaxed) {
         return true;
     }
+    let rendered = rt.rendered_slots.lock().unwrap();
     dirty_slots.iter().any(|s| rendered.contains(s))
 }
