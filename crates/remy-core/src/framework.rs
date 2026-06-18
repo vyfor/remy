@@ -10,6 +10,7 @@ use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
+use ratatui::backend::Backend;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::buffer::Buffer;
@@ -270,6 +271,7 @@ async fn run_loop<V: View>(
     let mut force_render = true;
     let mut frame_start = Instant::now();
     let mut composition: Option<Buffer> = None;
+    let mut presented: Option<Buffer> = None;
     let mut prev_overlays: Vec<Rect> = Vec::new();
 
     loop {
@@ -293,6 +295,7 @@ async fn run_loop<V: View>(
 
             if composition.as_ref().map(|b| b.area) != Some(area) {
                 composition = Some(Buffer::empty(area));
+                presented = Some(Buffer::empty(area));
                 crate::tracking::mark_cleared(area);
             }
 
@@ -331,16 +334,49 @@ async fn run_loop<V: View>(
 
             let cursor_pos = crate::tracking::take_cursor_position();
 
-            {
-                let cur = terminal.current_buffer_mut();
-                if cur.area == comp.area {
-                    cur.content.clone_from_slice(&comp.content);
-                } else {
-                    *cur = comp.clone();
+            let comp = composition.as_ref().unwrap();
+            let prev = presented.as_mut().unwrap();
+
+            if comp.area == prev.area {
+                let changes: Vec<(u16, u16)> = prev
+                    .diff_iter(comp)
+                    .map(|(col, row, _)| (col, row))
+                    .collect();
+
+                if !changes.is_empty() {
+                    let backend = terminal.backend_mut();
+                    backend.draw(changes.iter().map(|&(c, r)| {
+                        (c, r, comp.cell((c, r)).expect("in bounds"))
+                    }))?;
                 }
+
+                for (c, r) in &changes {
+                    if let (Some(src), Some(dst)) = (
+                        comp.cell((*c, *r)),
+                        prev.cell_mut((*c, *r)),
+                    ) {
+                        *dst = src.clone();
+                    }
+                }
+            } else {
+                *prev = comp.clone();
+                let backend = terminal.backend_mut();
+                backend.draw(prev.content.iter().enumerate().map(|(i, cell)| {
+                    let x = (i as u16) % comp.area.width + comp.area.x;
+                    let y = (i as u16) / comp.area.width + comp.area.y;
+                    (x, y, cell)
+                }))?;
             }
 
-            terminal.apply_buffer_with_cursor(cursor_pos)?;
+            match cursor_pos {
+                None => terminal.hide_cursor()?,
+                Some(pos) => {
+                    terminal.show_cursor()?;
+                    terminal.set_cursor_position(pos)?;
+                }
+            }
+            terminal.backend_mut().flush()?;
+
             runtime::finish_focus_frame();
             runtime::finish_mouse_frame();
         }
