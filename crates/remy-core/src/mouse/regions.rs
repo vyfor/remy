@@ -78,8 +78,7 @@ impl Regions {
 
         match event.kind {
             MouseEventKind::Moved | MouseEventKind::Drag(_) => {
-                let hover_changed = self.recompute_hover(active_capture);
-                (DispatchResult::None, hover_changed, None)
+                (DispatchResult::None, false, None)
             }
             MouseEventKind::Down(button) => {
                 let region = self.hit_region(pos, active_capture).cloned();

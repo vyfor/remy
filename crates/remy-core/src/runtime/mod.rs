@@ -90,6 +90,7 @@ pub struct Runtime {
     pub(crate) mouse: Mutex<Regions>,
     rendered_slots: Mutex<HashSet<SlotId>>,
     redraw_requested: AtomicBool,
+    mouse_changed: AtomicBool,
     pub(crate) component_caches: DashMap<OwnerId, ComponentCache>,
     pending_dirty: Mutex<Vec<SlotId>>,
     pub(crate) canvas: Mutex<Option<Rect>>,
@@ -121,6 +122,7 @@ impl Runtime {
             mouse: Mutex::new(Regions::default()),
             rendered_slots: Mutex::new(HashSet::new()),
             redraw_requested: AtomicBool::new(false),
+            mouse_changed: AtomicBool::new(false),
             component_caches: DashMap::new(),
             pending_dirty: Mutex::new(Vec::new()),
             canvas: Mutex::new(None),
@@ -168,6 +170,12 @@ pub fn redraw() {
 pub(crate) fn take_redraw() -> bool {
     Runtime::get()
         .redraw_requested
+        .swap(false, std::sync::atomic::Ordering::Relaxed)
+}
+
+pub(crate) fn take_mouse_changed() -> bool {
+    Runtime::get()
+        .mouse_changed
         .swap(false, std::sync::atomic::Ordering::Relaxed)
 }
 

@@ -13,10 +13,11 @@ pub fn finish_mouse_frame() {
     let rt = Runtime::get();
     let active_cap = active_capture_id();
     let (hover_changed, hovered_owners) = rt.mouse.lock().unwrap().finish_frame(active_cap);
-    for owner in hovered_owners {
-        mark_mouse_dirty(owner);
+    for owner in &hovered_owners {
+        mark_mouse_dirty(*owner);
     }
     if hover_changed {
+        rt.mouse_changed.store(true, std::sync::atomic::Ordering::Relaxed);
         rt.dirty_notify.notify_one();
     }
 }
@@ -94,8 +95,15 @@ pub fn dispatch_mouse_event(event: &crossterm::event::MouseEvent) -> Flow {
 }
 
 pub fn mark_mouse_dirty(owner: OwnerId) {
-    if let Some(mut entry) = Runtime::get().component_caches.get_mut(&owner) {
-        entry.mouse_dirty = true;
+    let rt = Runtime::get();
+    let mut current = Some(owner);
+    while let Some(id) = current {
+        if let Some(mut entry) = rt.component_caches.get_mut(&id) {
+            entry.mouse_dirty = true;
+            current = entry.parent;
+        } else {
+            break;
+        }
     }
 }
 

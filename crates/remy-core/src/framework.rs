@@ -275,8 +275,9 @@ async fn run_loop<V: View>(
     loop {
         let dirty_slots = runtime::apply_commits();
 
+        let mouse_changed = runtime::take_mouse_changed();
         let needs_draw =
-            force_render || runtime::take_redraw() || runtime::should_render(&dirty_slots);
+            force_render || runtime::take_redraw() || mouse_changed || runtime::should_render(&dirty_slots);
         force_render = false;
 
         if needs_draw {
