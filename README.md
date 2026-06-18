@@ -17,6 +17,7 @@ in the movie, **remy** is the little rat who hides under chef linguini's hat, pu
 - input handling (keys, chords, mouse)
 - focus
 - overlays
+- component caching
 
 ## usage
 
@@ -27,7 +28,9 @@ remy-tui = "0.0.1"
 ## examples
 
 ```rs
+use remy::ratatui::buffer::Buffer;
 use remy::ratatui::layout::Rect;
+use remy::ratatui::prelude::Widget;
 use remy::ratatui::widgets::{Block, Borders, Paragraph};
 use remy::{Framework, State, View, component, intent, quit, state, store};
 
@@ -38,31 +41,31 @@ pub fn counter() {
 
 #[intent]
 fn increment() {
-    counter::count.update(|c| *c += 1);
+    counter::count.update(|c| *count += 1);
 }
 
 #[intent]
 fn decrement() {
-    counter::count.update(|c| *c -= 1);
+    counter::count.update(|c| *count -= 1);
 }
 
 #[component]
 fn App() -> impl View {
-    move |frame: &mut remy::ratatui::Frame, area: Rect| {
+    move |buf: &mut Buffer, area: Rect| {
         let widget = Paragraph::new(format!("count: {}", *counter::count))
             .block(Block::new().title("counter").borders(Borders::ALL));
 
-        frame.render_widget(widget, area);
+        widget.render(area, buf);
     }
 }
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     Framework::new()
-        .keys(|keys| {
-            keys.bind('+', increment);
-            keys.bind('-', decrement);
-            keys.bind('q', quit);
+        .keys(|k| {
+            k.bind('+', increment);
+            k.bind('-', decrement);
+            k.bind('q', quit);
         })
         .run(App)
         .await
