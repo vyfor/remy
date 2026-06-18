@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use ratatui::layout::{Position, Rect};
 
+use crate::cached::{CachedMouseRegion, CachedOverlay};
 use crate::effect::EffectId;
 use crate::state::SlotId;
 
@@ -21,12 +22,25 @@ thread_local! {
     pub(crate) static DIRTY_SLOTS: RefCell<Vec<SlotId>> = const { RefCell::new(Vec::new()) };
     pub(crate) static CLEARED_AREAS: RefCell<Vec<Rect>> = const { RefCell::new(Vec::new()) };
     pub(crate) static CURSOR_POSITION: Cell<Option<Position>> = const { Cell::new(None) };
+
+    pub(crate) static CAPTURING: Cell<bool> = const { Cell::new(false) };
+    pub(crate) static CAPTURE_OWNER: Cell<Option<OwnerId>> = const { Cell::new(None) };
+    pub(crate) static DECLARED_REGIONS: RefCell<Vec<CachedMouseRegion>> =
+        const { RefCell::new(Vec::new()) };
+    pub(crate) static DECLARED_OVERLAYS: RefCell<Vec<CachedOverlay>> =
+        const { RefCell::new(Vec::new()) };
 }
 
 #[derive(Default)]
 pub struct OwnerFrame {
     pub own: Vec<SlotId>,
     pub children: Vec<SlotId>,
+    pub rendered_children: Vec<OwnerId>,
+}
+
+pub struct DeclarationCaptures {
+    pub regions: Vec<CachedMouseRegion>,
+    pub overlays: Vec<CachedOverlay>,
 }
 
 pub fn begin_render_tracking() {
@@ -66,9 +80,20 @@ pub fn pop_owner() -> OwnerFrame {
         if let Some(parent) = stack.borrow_mut().last_mut() {
             parent.children.extend(frame.own.iter().copied());
             parent.children.extend(frame.children.iter().copied());
+            parent.rendered_children.extend(frame.rendered_children.iter().copied());
         }
     });
     frame
+}
+
+pub fn record_child(child_id: OwnerId) {
+    OWNER_STACK.with(|stack| {
+        if let Some(top) = stack.borrow_mut().last_mut()
+            && !top.rendered_children.contains(&child_id)
+        {
+            top.rendered_children.push(child_id);
+        }
+    });
 }
 
 pub fn set_dirty_slots(slots: Vec<SlotId>) {
@@ -128,4 +153,41 @@ pub fn clear_area(buf: &mut ratatui::buffer::Buffer, area: Rect) {
         let start = (y + row) * width + x;
         buf.content[start..start + w].fill(ratatui::buffer::Cell::EMPTY);
     }
+}
+
+pub fn clear_declarations() {
+    DECLARED_REGIONS.with(|r| r.borrow_mut().clear());
+    DECLARED_OVERLAYS.with(|o| o.borrow_mut().clear());
+}
+
+pub fn begin_declaration_capture(owner: OwnerId) {
+    CAPTURING.set(true);
+    CAPTURE_OWNER.set(Some(owner));
+}
+
+pub fn end_declaration_capture() {
+    CAPTURING.set(false);
+    CAPTURE_OWNER.set(None);
+}
+
+pub fn is_capturing() -> bool {
+    CAPTURING.get()
+}
+
+pub fn capture_owner() -> Option<OwnerId> {
+    CAPTURE_OWNER.get()
+}
+
+pub fn record_mouse_region(region: CachedMouseRegion) {
+    DECLARED_REGIONS.with(|r| r.borrow_mut().push(region));
+}
+
+pub fn record_overlay(overlay: CachedOverlay) {
+    DECLARED_OVERLAYS.with(|o| o.borrow_mut().push(overlay));
+}
+
+pub fn drain_declarations() -> DeclarationCaptures {
+    let regions = DECLARED_REGIONS.with(|r| std::mem::take(&mut *r.borrow_mut()));
+    let overlays = DECLARED_OVERLAYS.with(|o| std::mem::take(&mut *o.borrow_mut()));
+    DeclarationCaptures { regions, overlays }
 }

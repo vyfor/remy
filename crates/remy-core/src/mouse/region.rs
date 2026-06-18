@@ -10,22 +10,16 @@ use crate::tracking::OwnerId;
 use super::{MouseAction, Pos, Scroll, ScrollAction};
 
 #[derive(Clone)]
-struct ButtonAction {
-    button: MouseButton,
-    action: MouseAction,
-}
-
-#[derive(Clone)]
 pub struct Region {
     pub(crate) id: FocusId,
-    area: Rect,
-    owner_id: Option<OwnerId>,
+    pub(crate) area: Rect,
+    pub owner_id: Option<OwnerId>,
     pub(crate) capture_id: Option<&'static str>,
-    pub(crate) focus_on_click: bool,
-    pub(crate) wants_hover: bool,
-    clicks: Vec<ButtonAction>,
-    presses: Vec<ButtonAction>,
-    releases: Vec<ButtonAction>,
+    pub focus_on_click: bool,
+    pub wants_hover: bool,
+    pub(crate) clicks: Vec<(MouseButton, MouseAction)>,
+    pub(crate) presses: Vec<(MouseButton, MouseAction)>,
+    pub(crate) releases: Vec<(MouseButton, MouseAction)>,
     pub(crate) scroll: Option<ScrollAction>,
 }
 
@@ -62,10 +56,8 @@ impl Region {
         F: Fn() -> R + Send + Sync + 'static,
         R: IntoFlow + 'static,
     {
-        self.clicks.push(ButtonAction {
-            button,
-            action: Arc::new(move || handler().into_key_result()),
-        });
+        self.clicks
+            .push((button, Arc::new(move || handler().into_key_result())));
     }
 
     pub fn on_press<F, R>(&mut self, button: MouseButton, handler: F)
@@ -73,10 +65,8 @@ impl Region {
         F: Fn() -> R + Send + Sync + 'static,
         R: IntoFlow + 'static,
     {
-        self.presses.push(ButtonAction {
-            button,
-            action: Arc::new(move || handler().into_key_result()),
-        });
+        self.presses
+            .push((button, Arc::new(move || handler().into_key_result())));
     }
 
     pub fn on_release<F, R>(&mut self, button: MouseButton, handler: F)
@@ -84,10 +74,8 @@ impl Region {
         F: Fn() -> R + Send + Sync + 'static,
         R: IntoFlow + 'static,
     {
-        self.releases.push(ButtonAction {
-            button,
-            action: Arc::new(move || handler().into_key_result()),
-        });
+        self.releases
+            .push((button, Arc::new(move || handler().into_key_result())));
     }
 
     pub fn on_scroll<F, R>(&mut self, handler: F)
@@ -114,11 +102,14 @@ impl Region {
             && pos.row < self.area.y.saturating_add(self.area.height)
     }
 
-    fn button_action(actions: &[ButtonAction], button: MouseButton) -> Option<MouseAction> {
+    fn button_action(
+        actions: &[(MouseButton, MouseAction)],
+        button: MouseButton,
+    ) -> Option<MouseAction> {
         actions
             .iter()
-            .find(|entry| entry.button == button)
-            .map(|entry| Arc::clone(&entry.action))
+            .find(|entry| entry.0 == button)
+            .map(|entry| Arc::clone(&entry.1))
     }
 
     pub(crate) fn press_action(&self, button: MouseButton) -> Option<MouseAction> {

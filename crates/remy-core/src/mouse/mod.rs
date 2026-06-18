@@ -14,7 +14,7 @@ pub(crate) type MouseAction = Arc<dyn Fn() -> Flow + Send + Sync>;
 pub(crate) type ScrollAction = Arc<dyn Fn(Scroll) -> Flow + Send + Sync>;
 
 pub use region::Region;
-pub use regions::Regions;
+pub use regions::{DispatchResult, Regions};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pos {

@@ -1,8 +1,13 @@
 use std::cell::RefCell;
+use std::sync::Arc;
 
 use ratatui::layout::Rect;
 
-pub type OverlayRender = Box<dyn FnOnce(&mut ratatui::buffer::Buffer, Rect)>;
+use crate::cached::{CachedOverlay, OverlayRenderFn};
+use crate::tracking::{capture_owner, is_capturing, record_overlay};
+use crate::tracking::OwnerId;
+
+pub type OverlayRender = OverlayRenderFn;
 
 pub struct OverlayEntry {
     pub rect: Rect,
@@ -15,6 +20,18 @@ thread_local! {
 
 pub fn push_overlay(rect: Rect, render: OverlayRender) {
     OVERLAYS.with(|o| o.borrow_mut().push(OverlayEntry { rect, render }));
+}
+
+pub fn push_overlay_from_cx<F>(owner_id: OwnerId, rect: Rect, render: F)
+where
+    F: Fn(&mut ratatui::buffer::Buffer, Rect) + Send + Sync + 'static,
+{
+    let arc: OverlayRender = Arc::new(render);
+    push_overlay(rect, arc.clone());
+
+    if is_capturing() && capture_owner() == Some(owner_id) {
+        record_overlay(CachedOverlay { rect, render: arc });
+    }
 }
 
 pub fn drain_overlays() -> Vec<OverlayEntry> {

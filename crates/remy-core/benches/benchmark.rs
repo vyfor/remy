@@ -121,7 +121,7 @@ fn cache(c: &mut Criterion) {
 
         group.bench_function("miss", |b| {
             b.iter_batched(
-                || take_cleared_areas(),
+                || take_cleared_areas,
                 |_| {
                     cached.render(&mut buf, area);
                 },

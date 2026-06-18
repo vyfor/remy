@@ -1,3 +1,4 @@
+use crate::cached::CachedMouseRegion;
 use crate::keyboard::Flow;
 use crate::mouse::Region;
 use crate::tracking::OwnerId;
@@ -11,7 +12,10 @@ pub fn begin_mouse_frame() {
 pub fn finish_mouse_frame() {
     let rt = Runtime::get();
     let active_cap = active_capture_id();
-    let hover_changed = rt.mouse.lock().unwrap().finish_frame(active_cap);
+    let (hover_changed, hovered_owners) = rt.mouse.lock().unwrap().finish_frame(active_cap);
+    for owner in hovered_owners {
+        mark_mouse_dirty(owner);
+    }
     if hover_changed {
         rt.dirty_notify.notify_one();
     }
@@ -20,7 +24,34 @@ pub fn finish_mouse_frame() {
 pub fn add_mouse_region(mut region: Region, owner_id: OwnerId) {
     let cap_id = current_frame_capture_id();
     region.attach_runtime(Some(owner_id), cap_id);
+
+    if crate::tracking::is_capturing() && crate::tracking::capture_owner() == Some(owner_id) {
+        let cached = crate::cached::CachedMouseRegion {
+            id: region.id,
+            area: region.area,
+            wants_hover: region.wants_hover,
+            focus_on_click: region.focus_on_click,
+            on_click: region.clicks.clone(),
+            on_press: region.presses.clone(),
+            on_release: region.releases.clone(),
+            on_scroll: region.scroll.clone(),
+        };
+        crate::tracking::record_mouse_region(cached);
+    }
+
     Runtime::get().mouse.lock().unwrap().register_region(region);
+}
+
+pub fn replay_mouse_region(owner_id: OwnerId, region: &CachedMouseRegion) {
+    let mut r = Region::new(region.id, region.area);
+    r.owner_id = Some(owner_id);
+    r.focus_on_click = region.focus_on_click;
+    r.wants_hover = region.wants_hover;
+    r.clicks = region.on_click.clone();
+    r.presses = region.on_press.clone();
+    r.releases = region.on_release.clone();
+    r.scroll = region.on_scroll.clone();
+    add_mouse_region(r, owner_id);
 }
 
 pub fn is_region_hovered(id: FocusId) -> bool {
@@ -30,12 +61,54 @@ pub fn is_region_hovered(id: FocusId) -> bool {
 pub fn dispatch_mouse_event(event: &crossterm::event::MouseEvent) -> Flow {
     let rt = Runtime::get();
     let active_cap = active_capture_id();
-    let (result, hover_changed, focus) = rt.mouse.lock().unwrap().dispatch_event(event, active_cap);
+    let (dispatch_result, hover_changed, focus) = {
+        let mut mouse = rt.mouse.lock().unwrap();
+        mouse.dispatch_event(event, active_cap)
+    };
+
     if let Some(focus) = focus {
         focus_id(focus);
     }
+
+    let result = match dispatch_result {
+        crate::mouse::DispatchResult::None => Flow::Ignored,
+        crate::mouse::DispatchResult::Single(action) => action(),
+        crate::mouse::DispatchResult::Multiple(actions) => {
+            let mut result = Flow::Ignored;
+            for action in actions {
+                let r = action();
+                result = match (result, r) {
+                    (Flow::Quit, _) | (_, Flow::Quit) => Flow::Quit,
+                    (Flow::Handled, _) | (_, Flow::Handled) => Flow::Handled,
+                    (Flow::Ignored, Flow::Ignored) => Flow::Ignored,
+                };
+            }
+            result
+        }
+    };
+
     if hover_changed {
         rt.dirty_notify.notify_one();
     }
     result
+}
+
+pub fn mark_mouse_dirty(owner: OwnerId) {
+    if let Some(mut entry) = Runtime::get().component_caches.get_mut(&owner) {
+        entry.mouse_dirty = true;
+    }
+}
+
+pub fn is_mouse_dirty(owner: OwnerId) -> bool {
+    Runtime::get()
+        .component_caches
+        .get(&owner)
+        .map(|e| e.mouse_dirty)
+        .unwrap_or(false)
+}
+
+pub fn clear_mouse_dirty(owner: OwnerId) {
+    if let Some(mut entry) = Runtime::get().component_caches.get_mut(&owner) {
+        entry.mouse_dirty = false;
+    }
 }

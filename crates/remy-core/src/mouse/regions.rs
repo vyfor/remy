@@ -1,9 +1,18 @@
+use std::collections::HashSet;
+use std::sync::Arc;
+
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
-use crate::keyboard::Flow;
 use crate::runtime::FocusId;
+use crate::tracking::OwnerId;
 
-use super::{Pos, Region, Scroll};
+use super::{MouseAction, Pos, Region, Scroll};
+
+pub enum DispatchResult {
+    None,
+    Single(MouseAction),
+    Multiple(Vec<MouseAction>),
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PressedRegion {
@@ -17,6 +26,7 @@ pub struct Regions {
     latest_position: Option<Pos>,
     hovered: Option<FocusId>,
     pressed: Option<PressedRegion>,
+    last_hovered_owner: Option<OwnerId>,
 }
 
 impl Regions {
@@ -32,22 +42,44 @@ impl Regions {
         self.hovered == Some(id)
     }
 
-    pub fn finish_frame(&mut self, active_capture: Option<&'static str>) -> bool {
-        self.recompute_hover(active_capture)
+    pub fn finish_frame(
+        &mut self,
+        active_capture: Option<&'static str>,
+    ) -> (bool, HashSet<OwnerId>) {
+        let prev_owner = self.last_hovered_owner;
+        let hover_changed = self.recompute_hover(active_capture);
+        let mut owners: HashSet<OwnerId> = HashSet::new();
+        if prev_owner != self.last_hovered_owner {
+            if let Some(o) = prev_owner {
+                owners.insert(o);
+            }
+            if let Some(o) = self.last_hovered_owner {
+                owners.insert(o);
+            }
+        }
+        (hover_changed, owners)
+    }
+
+    pub fn hovered_owner_ids(&self) -> HashSet<OwnerId> {
+        self.last_hovered_owner.into_iter().collect()
+    }
+
+    pub fn region_count(&self) -> usize {
+        self.regions.len()
     }
 
     pub fn dispatch_event(
         &mut self,
         event: &MouseEvent,
         active_capture: Option<&'static str>,
-    ) -> (Flow, bool, Option<FocusId>) {
+    ) -> (DispatchResult, bool, Option<FocusId>) {
         let pos = Pos::from_event(event);
         self.latest_position = Some(pos);
 
         match event.kind {
             MouseEventKind::Moved | MouseEventKind::Drag(_) => {
                 let hover_changed = self.recompute_hover(active_capture);
-                (Flow::Handled, hover_changed, None)
+                (DispatchResult::None, hover_changed, None)
             }
             MouseEventKind::Down(button) => {
                 let region = self.hit_region(pos, active_capture).cloned();
@@ -57,74 +89,65 @@ impl Regions {
                         button,
                     });
                     if let Some(action) = region.press_action(button) {
-                        return (action(), false, None);
+                        return (DispatchResult::Single(action), false, None);
                     }
                     if region.has_click_interest(button) {
-                        return (Flow::Handled, false, None);
+                        return (DispatchResult::None, false, None);
                     }
                 }
-                (Flow::Ignored, false, None)
+                (DispatchResult::None, false, None)
             }
             MouseEventKind::Up(button) => {
                 let region = self.hit_region(pos, active_capture).cloned();
                 let pressed = self.pressed.take();
                 let Some(region) = region else {
-                    return (Flow::Ignored, false, None);
+                    return (DispatchResult::None, false, None);
                 };
 
-                let mut result = region
-                    .release_action(button)
-                    .map(|action| action())
-                    .unwrap_or(Flow::Ignored);
-
+                let release_action = region.release_action(button);
                 let is_click = pressed
                     == Some(PressedRegion {
                         id: region.id,
                         button,
                     });
+
                 if is_click {
                     let focus = region.focus_on_click.then_some(region.id);
-                    if let Some(action) = region.click_action(button) {
-                        result = combine_results(result, action());
-                    } else if region.focus_on_click {
-                        result = combine_results(result, Flow::Handled);
+                    let click_action = region.click_action(button);
+                    let actions: Vec<_> = release_action
+                        .into_iter()
+                        .chain(click_action)
+                        .collect();
+                    if actions.is_empty() && region.focus_on_click {
+                        return (DispatchResult::None, false, focus);
                     }
-                    return (result, false, focus);
+                    return (DispatchResult::Multiple(actions), false, focus);
                 }
 
-                (result, false, None)
+                match release_action {
+                    Some(action) => (DispatchResult::Single(action), false, None),
+                    None => (DispatchResult::None, false, None),
+                }
             }
             MouseEventKind::ScrollUp => self.dispatch_scroll(
                 pos,
                 active_capture,
-                Scroll {
-                    delta_x: 0,
-                    delta_y: 1,
-                },
+                Scroll { delta_x: 0, delta_y: 1 },
             ),
             MouseEventKind::ScrollDown => self.dispatch_scroll(
                 pos,
                 active_capture,
-                Scroll {
-                    delta_x: 0,
-                    delta_y: -1,
-                },
+                Scroll { delta_x: 0, delta_y: -1 },
             ),
             MouseEventKind::ScrollLeft => self.dispatch_scroll(
                 pos,
                 active_capture,
-                Scroll {
-                    delta_x: -1,
-                    delta_y: 0,
-                },
+                Scroll { delta_x: -1, delta_y: 0 },
             ),
             MouseEventKind::ScrollRight => self.dispatch_scroll(
                 pos,
                 active_capture,
-                Scroll {
-                    delta_x: 1,
-                    delta_y: 0,
-                },
+                Scroll { delta_x: 1, delta_y: 0 },
             ),
         }
     }
@@ -134,13 +157,18 @@ impl Regions {
         pos: Pos,
         active_capture: Option<&'static str>,
         scroll: Scroll,
-    ) -> (Flow, bool, Option<FocusId>) {
-        let result = self
+    ) -> (DispatchResult, bool, Option<FocusId>) {
+        let handler = self
             .hit_region(pos, active_capture)
-            .and_then(|region| region.scroll.as_ref())
-            .map(|handler| handler(scroll))
-            .unwrap_or(Flow::Ignored);
-        (result, false, None)
+            .and_then(|region| region.scroll.clone());
+
+        match handler {
+            Some(h) => {
+                let action: MouseAction = Arc::new(move || h(scroll));
+                (DispatchResult::Single(action), false, None)
+            }
+            None => (DispatchResult::None, false, None),
+        }
     }
 
     fn recompute_hover(&mut self, active_capture: Option<&'static str>) -> bool {
@@ -155,10 +183,17 @@ impl Regions {
                 })
                 .map(|region| region.id)
         });
+        let owner = hovered.and_then(|id| {
+            self.regions
+                .iter()
+                .find(|r| r.id == id)
+                .and_then(|r| r.owner_id)
+        });
         if self.hovered == hovered {
             return false;
         }
         self.hovered = hovered;
+        self.last_hovered_owner = owner;
         true
     }
 
@@ -176,13 +211,5 @@ impl Regions {
             Some(active) => region_capture == Some(active),
             None => true,
         }
-    }
-}
-
-fn combine_results(left: Flow, right: Flow) -> Flow {
-    match (left, right) {
-        (Flow::Quit, _) | (_, Flow::Quit) => Flow::Quit,
-        (Flow::Handled, _) | (_, Flow::Handled) => Flow::Handled,
-        (Flow::Ignored, Flow::Ignored) => Flow::Ignored,
     }
 }

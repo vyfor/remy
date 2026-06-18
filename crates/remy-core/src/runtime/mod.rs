@@ -52,10 +52,10 @@ pub use key::{
 };
 pub(crate) use key::{ChordState, FocusKeys, LayerEntry, ViewKeys};
 pub use mouse::{
-    add_mouse_region, begin_mouse_frame, dispatch_mouse_event, finish_mouse_frame,
-    is_region_hovered,
+    add_mouse_region, begin_mouse_frame, clear_mouse_dirty, dispatch_mouse_event,
+    finish_mouse_frame, is_mouse_dirty, is_region_hovered, mark_mouse_dirty, replay_mouse_region,
 };
-pub use overlay::{drain_overlays, overlay_rects, push_overlay};
+pub use overlay::{drain_overlays, overlay_rects, push_overlay, push_overlay_from_cx};
 pub use resource::{
     bump_resource_gen, current_resource_gen, has_resource_fetched, mark_resource_fetched,
 };

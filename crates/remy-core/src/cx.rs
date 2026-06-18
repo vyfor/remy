@@ -34,16 +34,13 @@ impl Cx {
     pub fn overlay(
         self,
         rect: ratatui::layout::Rect,
-        render: impl FnOnce(Cx, &mut ratatui::buffer::Buffer, ratatui::layout::Rect) + 'static,
+        render: impl Fn(Cx, &mut ratatui::buffer::Buffer, ratatui::layout::Rect) + Send + Sync + 'static,
     ) {
         let owner_id = self.owner_id;
-        runtime::push_overlay(
-            rect,
-            Box::new(move |buf, area| {
-                let cx = Cx::new(owner_id);
-                render(cx, buf, area);
-            }),
-        );
+        runtime::push_overlay_from_cx(self.owner_id, rect, move |buf, area| {
+            let cx = Cx::new(owner_id);
+            render(cx, buf, area);
+        });
     }
 
     pub fn global<T: Send + Sync + Clone + 'static>(self) -> T {
