@@ -19,6 +19,7 @@ dashmap = { workspace = true }
 arc-swap = { workspace = true }
 futures-util = { workspace = true }
 smallvec = "1"
+rapidhash = "4.4.1"
 
 [dev-dependencies]
 criterion = "0.8"

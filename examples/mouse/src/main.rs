@@ -23,7 +23,7 @@ fn right_click() {
 }
 
 #[component]
-fn ClickBox(cx: remy::Cx) -> impl View {
+fn ClickBox(cx: remy::Cx) {
     cx.keys().on_press('q', quit);
 
     move |rcx: Rcx, buf: &mut Buffer, area: Rect| {
@@ -55,7 +55,7 @@ fn ClickBox(cx: remy::Cx) -> impl View {
 }
 
 #[component]
-fn App() -> impl View {
+fn App() {
     move |rcx: Rcx, buf: &mut Buffer, area: Rect| {
         let rect = area.centered(Constraint::Length(24), Constraint::Length(5));
         ClickBox().render(rcx, buf, rect);

@@ -20,7 +20,7 @@ fn decrement() {
 }
 
 #[component]
-fn App(cx: remy::Cx) -> impl View {
+fn App(cx: remy::Cx) {
     cx.keys()
         .on_press('+', increment)
         .on_press('-', decrement)
