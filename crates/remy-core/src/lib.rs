@@ -21,7 +21,7 @@ pub mod transaction;
 pub mod view;
 
 pub use cached::CachedView;
-pub use cx::Cx;
+pub use cx::{Cx, Rcx};
 pub use focus::{Focus, FocusGroup, FocusTarget};
 pub use framework::{Framework, Text};
 pub use keyboard::{Bind, BindKind, Chord, ChordPolicy, Flow, IntoBind, Key, Keys, Mods, quit};

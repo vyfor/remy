@@ -7,7 +7,7 @@ pub use remy_core::keyboard::{IntoBind, IntoFlow};
 pub use remy_core::runtime::Runtime;
 pub use remy_core::tracking::set_cursor_position;
 pub use remy_core::{
-    Bind, BindKind, CachedView, Chord, ChordPolicy, Cx, Flow, Framework, Init, Key, Keys,
+    Bind, BindKind, CachedView, Chord, ChordPolicy, Cx, Rcx, Flow, Framework, Init, Key, Keys,
     LayerHandle, LayerId, Load, Memo, Mods, Owner, Pos, Proxy, Query, QueryOpts, Refresh, Region,
     Resource, ResourceOpts, Retry, Scope, Scroll, SlotId, State, StoreCx, Text, Transaction, View,
     const_slot_id, memo, query, resource, state, transaction,

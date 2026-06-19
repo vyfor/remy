@@ -1,7 +1,6 @@
 pub use crate::runtime::FocusId;
 
-use crate::key::Keys;
-use crate::keyboard::Flow;
+use crate::keyboard::{Flow, IntoBind, IntoFlow};
 use crate::runtime;
 use crate::tracking::OwnerId;
 
@@ -155,10 +154,58 @@ impl Focus {
         self.focused()
     }
 
-    pub fn keys(self, configure: impl FnOnce(&mut Keys)) {
-        let mut keys = Keys::new();
-        configure(&mut keys);
-        runtime::add_focus_keys(self.owner_id, self.id, keys);
+    pub fn on_press<K, F, R>(self, key: K, action: F)
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        runtime::add_static_focus_key_press(self.owner_id, self.id, key.into_key_binding(), move || action().into_key_result());
+    }
+
+    pub fn on_release<K, F, R>(self, key: K, action: F)
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        runtime::add_static_focus_key_release(self.owner_id, self.id, key.into_key_binding(), move || action().into_key_result());
+    }
+
+    pub fn on_repeat<K, F, R>(self, key: K, action: F)
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        runtime::add_static_focus_key_repeat(self.owner_id, self.id, key.into_key_binding(), move || action().into_key_result());
+    }
+
+    pub fn live_on_press<K, F, R>(self, key: K, action: F)
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        runtime::add_live_focus_key_press(self.owner_id, self.id, key.into_key_binding(), move || action().into_key_result());
+    }
+
+    pub fn live_on_release<K, F, R>(self, key: K, action: F)
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        runtime::add_live_focus_key_release(self.owner_id, self.id, key.into_key_binding(), move || action().into_key_result());
+    }
+
+    pub fn live_on_repeat<K, F, R>(self, key: K, action: F)
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        runtime::add_live_focus_key_repeat(self.owner_id, self.id, key.into_key_binding(), move || action().into_key_result());
     }
 
     pub fn focus(self) -> Flow {

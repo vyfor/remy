@@ -17,6 +17,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc;
 
+use crate::cx::Rcx;
 use crate::keyboard::{self, Chord, ChordPolicy, Flow, IntoFlow, Key, Keys};
 use crate::runtime;
 use crate::scope::Globals;
@@ -317,7 +318,7 @@ async fn run_loop<V: View>(
             crate::tracking::set_dirty_slots(dirty_slots.clone());
             crate::tracking::begin_render_tracking();
             runtime::begin_render();
-            root.render(comp, area);
+            root.render(Rcx::new(0), comp, area);
 
             let overlays = runtime::drain_overlays();
             for entry in &overlays {
@@ -328,6 +329,7 @@ async fn run_loop<V: View>(
             }
 
             runtime::end_render();
+            runtime::finish_keys();
             crate::tracking::end_render_tracking();
             runtime::flush_render_reads();
             crate::tracking::take_cleared_areas();

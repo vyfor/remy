@@ -2,7 +2,7 @@ use remy::ratatui::buffer::Buffer;
 use remy::ratatui::layout::Rect;
 use remy::ratatui::prelude::Widget;
 use remy::ratatui::widgets::{Block, Borders, Paragraph};
-use remy::{Framework, State, View, component, intent, quit, state, store};
+use remy::{Framework, Rcx, State, View, component, intent, quit, state, store};
 
 #[store]
 pub fn counter() {
@@ -20,8 +20,12 @@ fn decrement() {
 }
 
 #[component]
-fn App() -> impl View {
-    move |buf: &mut Buffer, area: Rect| {
+fn App(cx: remy::Cx) -> impl View {
+    cx.on_press('+', increment);
+    cx.on_press('-', decrement);
+    cx.on_press('q', quit);
+
+    move |_rcx: Rcx, buf: &mut Buffer, area: Rect| {
         let widget = Paragraph::new(format!("count: {}", *counter::count))
             .block(Block::new().title("counter").borders(Borders::ALL));
 
@@ -31,12 +35,5 @@ fn App() -> impl View {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    Framework::new()
-        .keys(|keys| {
-            keys.on_press('+', increment);
-            keys.on_press('-', decrement);
-            keys.on_press('q', quit);
-        })
-        .run(App)
-        .await
+    Framework::new().run(App).await
 }

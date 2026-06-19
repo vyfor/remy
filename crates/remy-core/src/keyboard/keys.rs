@@ -13,7 +13,7 @@ struct Prefix {
 }
 
 #[derive(Clone, Default)]
-pub struct Keys {
+pub(crate) struct KeysInner {
     single_bindings: HashMap<Key, Action>,
     chord_bindings: HashMap<Chord, Action>,
     chord_prefixes: HashSet<Chord>,
@@ -24,9 +24,60 @@ pub struct Keys {
     repeat_bindings: HashMap<Key, Action>,
 }
 
+#[derive(Clone, Default)]
+pub struct Keys {
+    inner: Arc<KeysInner>,
+}
+
 impl Keys {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub(crate) fn inner_mut(&mut self) -> &mut KeysInner {
+        Arc::make_mut(&mut self.inner)
+    }
+
+    pub(crate) fn insert_press_once(&mut self, binding: Chord, action: Action) {
+        let inner = Arc::make_mut(&mut self.inner);
+        if binding.len() == 1 {
+            let key = binding.first().unwrap();
+            inner.single_bindings.entry(key).or_insert(action);
+        }
+    }
+
+    pub(crate) fn insert_release_once(&mut self, key: Key, action: Action) {
+        Arc::make_mut(&mut self.inner)
+            .release_bindings
+            .entry(key)
+            .or_insert(action);
+    }
+
+    pub(crate) fn insert_repeat_once(&mut self, key: Key, action: Action) {
+        Arc::make_mut(&mut self.inner)
+            .repeat_bindings
+            .entry(key)
+            .or_insert(action);
+    }
+
+    pub(crate) fn insert_press(&mut self, binding: Chord, action: Action) {
+        let inner = Arc::make_mut(&mut self.inner);
+        if binding.len() == 1 {
+            let key = binding.first().unwrap();
+            inner.single_bindings.insert(key, action);
+        }
+    }
+
+    pub(crate) fn insert_release(&mut self, key: Key, action: Action) {
+        Arc::make_mut(&mut self.inner)
+            .release_bindings
+            .insert(key, action);
+    }
+
+    pub(crate) fn insert_repeat(&mut self, key: Key, action: Action) {
+        Arc::make_mut(&mut self.inner)
+            .repeat_bindings
+            .insert(key, action);
     }
 
     pub fn on_press<K, F, R>(&mut self, key: K, action: F) -> &mut Self
@@ -48,7 +99,8 @@ impl Keys {
     {
         let binding = key.into_key_binding();
         if let Some(k) = binding.first() {
-            self.release_bindings
+            self.inner_mut()
+                .release_bindings
                 .insert(k, Arc::new(move || action().into_key_result()));
         }
         self
@@ -62,7 +114,8 @@ impl Keys {
     {
         let binding = key.into_key_binding();
         if let Some(k) = binding.first() {
-            self.repeat_bindings
+            self.inner_mut()
+                .repeat_bindings
                 .insert(k, Arc::new(move || action().into_key_result()));
         }
         self
@@ -93,7 +146,9 @@ impl Keys {
         for key in keys {
             let binding = key.into_key_binding();
             if let Some(k) = binding.first() {
-                self.release_bindings.insert(k, Arc::clone(&action));
+                self.inner_mut()
+                    .release_bindings
+                    .insert(k, Arc::clone(&action));
             }
         }
         self
@@ -110,81 +165,94 @@ impl Keys {
         for key in keys {
             let binding = key.into_key_binding();
             if let Some(k) = binding.first() {
-                self.repeat_bindings.insert(k, Arc::clone(&action));
+                self.inner_mut()
+                    .repeat_bindings
+                    .insert(k, Arc::clone(&action));
             }
         }
         self
     }
 
     pub fn chord_timeout(&mut self, timeout: Duration) -> &mut Self {
-        self.chord_timeout = Some(timeout);
+        self.inner_mut().chord_timeout = Some(timeout);
         self
     }
 
     pub fn clear_chord_timeout(&mut self) -> &mut Self {
-        self.chord_timeout = None;
+        self.inner_mut().chord_timeout = None;
         self
     }
 
     pub fn chord_policy(&mut self, policy: ChordPolicy) -> &mut Self {
-        self.chord_policy = policy;
+        self.inner_mut().chord_policy = policy;
         self
     }
 
     pub fn prefix_timeout(&mut self, prefix: impl IntoBind, timeout: Duration) -> &mut Self {
         let prefix = prefix.into_key_binding();
         assert!(!prefix.is_empty(), "key chord prefix cannot be empty");
-        self.prefix_options.entry(prefix).or_default().timeout = Some(timeout);
+        self.inner_mut()
+            .prefix_options
+            .entry(prefix)
+            .or_default()
+            .timeout = Some(timeout);
         self
     }
 
     pub fn prefix_policy(&mut self, prefix: impl IntoBind, policy: ChordPolicy) -> &mut Self {
         let prefix = prefix.into_key_binding();
         assert!(!prefix.is_empty(), "key chord prefix cannot be empty");
-        self.prefix_options.entry(prefix).or_default().policy = Some(policy);
+        self.inner_mut()
+            .prefix_options
+            .entry(prefix)
+            .or_default()
+            .policy = Some(policy);
         self
     }
 
     pub fn dispatch(&self, key: Key) -> Option<Flow> {
-        self.single_bindings.get(&key).map(|action| action())
+        self.inner.single_bindings.get(&key).map(|action| action())
     }
 
     pub fn dispatch_release(&self, key: Key) -> Option<Flow> {
-        self.release_bindings.get(&key).map(|action| action())
+        self.inner.release_bindings.get(&key).map(|action| action())
     }
 
     pub fn dispatch_repeat(&self, key: Key) -> Option<Flow> {
-        self.repeat_bindings.get(&key).map(|action| action())
+        self.inner.repeat_bindings.get(&key).map(|action| action())
     }
 
     pub fn dispatch_chord(&self, keys: &Chord) -> Option<Flow> {
-        self.chord_bindings.get(keys).map(|action| action())
+        self.inner.chord_bindings.get(keys).map(|action| action())
     }
 
     pub fn has_chords(&self) -> bool {
-        !self.chord_bindings.is_empty()
+        !self.inner.chord_bindings.is_empty()
     }
 
     pub fn is_chord_prefix(&self, prefix: &Chord) -> bool {
-        self.chord_prefixes.contains(prefix)
+        self.inner.chord_prefixes.contains(prefix)
     }
 
     pub fn timeout_for_prefix(&self, prefix: &Chord) -> Option<Duration> {
-        self.prefix_options
+        self.inner
+            .prefix_options
             .get(prefix)
             .and_then(|options| options.timeout)
-            .or(self.chord_timeout)
+            .or(self.inner.chord_timeout)
     }
 
     pub fn policy_for_prefix(&self, prefix: &Chord) -> ChordPolicy {
-        self.prefix_options
+        self.inner
+            .prefix_options
             .get(prefix)
             .and_then(|options| options.policy)
-            .unwrap_or(self.chord_policy)
+            .unwrap_or(self.inner.chord_policy)
     }
 
     pub fn chord_completions(&self, prefix: &Chord) -> Vec<(Chord, String)> {
         let mut completions = self
+            .inner
             .chord_bindings
             .keys()
             .filter(|keys| keys.starts_with(prefix) && keys.len() > prefix.len())
@@ -195,14 +263,12 @@ impl Keys {
     }
 
     pub fn labels(&self) -> Vec<String> {
-        self.descriptions()
-            .into_iter()
-            .map(|info| info.label)
-            .collect()
+        self.descriptions().into_iter().map(|info| info.label).collect()
     }
 
     pub fn descriptions(&self) -> Vec<Bind> {
         let mut descriptions = self
+            .inner
             .single_bindings
             .keys()
             .copied()
@@ -214,7 +280,7 @@ impl Keys {
                     kind: BindKind::Single,
                 }
             })
-            .chain(self.chord_bindings.keys().cloned().map(|keys| Bind {
+            .chain(self.inner.chord_bindings.keys().cloned().map(|keys| Bind {
                 label: keys.label(),
                 keys,
                 kind: BindKind::Chord,
@@ -226,15 +292,16 @@ impl Keys {
 
     fn bind_action(&mut self, keys: Chord, action: Action) {
         assert!(!keys.is_empty(), "key binding cannot be empty");
+        let inner = self.inner_mut();
         if keys.len() == 1 {
             let key = keys.first().expect("where key?");
-            self.single_bindings.insert(key, action);
+            inner.single_bindings.insert(key, action);
         } else {
-            self.chord_bindings.insert(keys, action);
-            self.chord_prefixes.clear();
-            for keys in self.chord_bindings.keys() {
+            inner.chord_bindings.insert(keys, action);
+            inner.chord_prefixes.clear();
+            for keys in inner.chord_bindings.keys() {
                 for len in 1..keys.len() {
-                    self.chord_prefixes.insert(keys.prefix(len));
+                    inner.chord_prefixes.insert(keys.prefix(len));
                 }
             }
         }

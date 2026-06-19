@@ -52,4 +52,6 @@ pub fn set_active_owner(owner_id: Option<OwnerId>) -> Option<OwnerId> {
 pub fn dispose_owner(owner_id: OwnerId) {
     cancel_owner(owner_id);
     remove_owner_focus(owner_id);
+    Runtime::get().component_caches.remove(&owner_id);
+    super::remove_static_keys(owner_id);
 }

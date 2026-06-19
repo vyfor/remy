@@ -45,10 +45,17 @@ pub(crate) use focus::{
 pub use global::{dispatch_intent, get_global, get_global_arc, report_error};
 pub use key::{
     ChordOrigin, ExpiredChord, FocusKey, LayerHandle, LayerId, PendingChord, ViewKey,
-    add_focus_keys, add_layer, add_view_keys, begin_keys, cancel_owner, cancel_stale_chord,
-    chord_completions, chord_deadline, chord_stale, focus_keys, keys_for, layers, pending_chord,
-    pending_chord_keys, pending_chord_label, reset_chord, set_global_keys, start_chord,
-    take_expired_chord, update_chord, view_keys,
+    add_layer, begin_keys, finish_keys, cancel_owner, cancel_stale_chord,
+    chord_completions, chord_deadline, chord_stale, focus_keys, keys_for,
+    layers, pending_chord, pending_chord_keys, pending_chord_label, reset_chord, set_global_keys,
+    start_chord, take_expired_chord, update_chord, view_keys,
+    add_static_view_key_press, add_static_view_key_press_arc,
+    add_static_view_key_release, add_static_view_key_repeat,
+    add_static_focus_key_press, add_static_focus_key_release, add_static_focus_key_repeat,
+    add_live_view_key_press, add_live_view_key_press_arc,
+    add_live_view_key_release, add_live_view_key_repeat,
+    add_live_focus_key_press, add_live_focus_key_release, add_live_focus_key_repeat,
+    remove_static_keys,
 };
 pub(crate) use key::{ChordState, FocusKeys, LayerEntry, ViewKeys};
 pub use mouse::{
@@ -83,6 +90,14 @@ pub struct Runtime {
     pub(crate) view_counts: Mutex<HashMap<OwnerId, u32>>,
     pub(crate) focus_keys: Mutex<Vec<FocusKeys>>,
     pub(crate) focus_counts: Mutex<HashMap<(OwnerId, FocusId), u32>>,
+    // live = at render time
+    pub(crate) live_view_key_buf: Mutex<HashMap<OwnerId, Keys>>,
+    pub(crate) live_focus_key_buf: Mutex<HashMap<(OwnerId, FocusId), Keys>>,
+    // static = at setup time
+    pub(crate) static_view_keys: Mutex<HashMap<OwnerId, Keys>>,
+    pub(crate) static_focus_keys: Mutex<HashMap<(OwnerId, FocusId), Keys>>,
+    pub(crate) static_view_seen: Mutex<HashSet<OwnerId>>,
+    pub(crate) static_focus_seen: Mutex<HashSet<OwnerId>>,
     pub(crate) global_keys: Mutex<Keys>,
     pub(crate) layers: Mutex<Vec<LayerEntry>>,
     next_layer: AtomicU64,
@@ -116,6 +131,12 @@ impl Runtime {
             view_counts: Mutex::new(HashMap::new()),
             focus_keys: Mutex::new(Vec::new()),
             focus_counts: Mutex::new(HashMap::new()),
+            live_view_key_buf: Mutex::new(HashMap::new()),
+            live_focus_key_buf: Mutex::new(HashMap::new()),
+            static_view_keys: Mutex::new(HashMap::new()),
+            static_focus_keys: Mutex::new(HashMap::new()),
+            static_view_seen: Mutex::new(HashSet::new()),
+            static_focus_seen: Mutex::new(HashSet::new()),
             global_keys: Mutex::new(Keys::new()),
             layers: Mutex::new(Vec::new()),
             next_layer: AtomicU64::new(1),

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 
+use crate::cx::Rcx;
 use crate::mouse::{MouseAction, ScrollAction};
 use crate::runtime::FocusId;
 use crate::state::SlotId;
@@ -69,8 +70,12 @@ impl<V: View> CachedView<V> {
 }
 
 impl<V: View> View for CachedView<V> {
-    fn render(&self, buf: &mut Buffer, area: Rect) {
+    fn render(&self, _rcx: Rcx, buf: &mut Buffer, area: Rect) {
         let rt = crate::runtime::Runtime::get();
+
+        rt.static_view_seen.lock().unwrap().insert(self.owner_id);
+        rt.static_focus_seen.lock().unwrap().insert(self.owner_id);
+
         let mut entry = rt.component_caches.entry(self.owner_id).or_default();
 
         let own_dirty = any_slot_dirty(&entry.own_slots);
@@ -122,7 +127,7 @@ impl<V: View> View for CachedView<V> {
         crate::tracking::ACTIVE_OWNER.set(Some(self.owner_id));
         push_owner();
 
-        self.view.render(buf, area);
+        self.view.render(Rcx::new(self.owner_id), buf, area);
 
         let frame = pop_owner();
         crate::tracking::ACTIVE_OWNER.set(prev);
