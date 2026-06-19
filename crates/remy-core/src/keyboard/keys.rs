@@ -20,6 +20,8 @@ pub struct Keys {
     prefix_options: HashMap<Chord, Prefix>,
     chord_timeout: Option<Duration>,
     chord_policy: ChordPolicy,
+    release_bindings: HashMap<Key, Action>,
+    repeat_bindings: HashMap<Key, Action>,
 }
 
 impl Keys {
@@ -27,7 +29,7 @@ impl Keys {
         Self::default()
     }
 
-    pub fn bind<K, F, R>(&mut self, key: K, action: F) -> &mut Self
+    pub fn on_press<K, F, R>(&mut self, key: K, action: F) -> &mut Self
     where
         K: IntoBind,
         F: Fn() -> R + Send + Sync + 'static,
@@ -38,7 +40,35 @@ impl Keys {
         self
     }
 
-    pub fn bind_any<I, K, F, R>(&mut self, keys: I, action: F) -> &mut Self
+    pub fn on_release<K, F, R>(&mut self, key: K, action: F) -> &mut Self
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        let binding = key.into_key_binding();
+        if let Some(k) = binding.first() {
+            self.release_bindings
+                .insert(k, Arc::new(move || action().into_key_result()));
+        }
+        self
+    }
+
+    pub fn on_repeat<K, F, R>(&mut self, key: K, action: F) -> &mut Self
+    where
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        let binding = key.into_key_binding();
+        if let Some(k) = binding.first() {
+            self.repeat_bindings
+                .insert(k, Arc::new(move || action().into_key_result()));
+        }
+        self
+    }
+
+    pub fn on_press_any<I, K, F, R>(&mut self, keys: I, action: F) -> &mut Self
     where
         I: IntoIterator<Item = K>,
         K: IntoBind,
@@ -48,6 +78,40 @@ impl Keys {
         let action: Action = Arc::new(move || action().into_key_result());
         for key in keys {
             self.bind_action(key.into_key_binding(), Arc::clone(&action));
+        }
+        self
+    }
+
+    pub fn on_release_any<I, K, F, R>(&mut self, keys: I, action: F) -> &mut Self
+    where
+        I: IntoIterator<Item = K>,
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        let action: Action = Arc::new(move || action().into_key_result());
+        for key in keys {
+            let binding = key.into_key_binding();
+            if let Some(k) = binding.first() {
+                self.release_bindings.insert(k, Arc::clone(&action));
+            }
+        }
+        self
+    }
+
+    pub fn on_repeat_any<I, K, F, R>(&mut self, keys: I, action: F) -> &mut Self
+    where
+        I: IntoIterator<Item = K>,
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        let action: Action = Arc::new(move || action().into_key_result());
+        for key in keys {
+            let binding = key.into_key_binding();
+            if let Some(k) = binding.first() {
+                self.repeat_bindings.insert(k, Arc::clone(&action));
+            }
         }
         self
     }
@@ -83,6 +147,14 @@ impl Keys {
 
     pub fn dispatch(&self, key: Key) -> Option<Flow> {
         self.single_bindings.get(&key).map(|action| action())
+    }
+
+    pub fn dispatch_release(&self, key: Key) -> Option<Flow> {
+        self.release_bindings.get(&key).map(|action| action())
+    }
+
+    pub fn dispatch_repeat(&self, key: Key) -> Option<Flow> {
+        self.repeat_bindings.get(&key).map(|action| action())
     }
 
     pub fn dispatch_chord(&self, keys: &Chord) -> Option<Flow> {

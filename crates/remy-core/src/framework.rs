@@ -455,14 +455,24 @@ fn dispatch_event(event: Event, key_bindings: &Keys, input_handlers: &Inputs) ->
         }
         Event::Key(key) if key.kind == KeyEventKind::Repeat => {
             if let Some(key) = Key::from_event(key) {
-                input_handlers.key_repeat(key)
+                let result = dispatch_key_repeat(key, key_bindings);
+                if result == Flow::Ignored {
+                    input_handlers.key_repeat(key)
+                } else {
+                    result
+                }
             } else {
                 Flow::Ignored
             }
         }
         Event::Key(key) if key.kind == KeyEventKind::Release => {
             if let Some(key) = Key::from_event(key) {
-                input_handlers.key_release(key)
+                let result = dispatch_key_release(key, key_bindings);
+                if result == Flow::Ignored {
+                    input_handlers.key_release(key)
+                } else {
+                    result
+                }
             } else {
                 Flow::Ignored
             }
@@ -542,6 +552,68 @@ fn dispatch_key(key: Key, global_bindings: &Keys) -> Flow {
     dispatch_layer(key, global_bindings, runtime::ChordOrigin::Global).unwrap_or(Flow::Handled)
 }
 
+fn dispatch_key_release(key: Key, global_bindings: &Keys) -> Flow {
+    for (id, bindings) in runtime::focus_keys() {
+        match dispatch_layer_release(key, &bindings, runtime::ChordOrigin::Focus(id)) {
+            Some(Flow::Ignored) | None => {}
+            Some(result) => return result,
+        }
+    }
+
+    for (id, bindings) in runtime::view_keys() {
+        match dispatch_layer_release(key, &bindings, runtime::ChordOrigin::View(id)) {
+            Some(Flow::Ignored) | None => {}
+            Some(result) => return result,
+        }
+    }
+
+    if runtime::capture_active() {
+        return Flow::Handled;
+    }
+
+    for (layer_id, layer_bindings) in runtime::layers() {
+        let origin = runtime::ChordOrigin::Layer(layer_id);
+        match dispatch_layer_release(key, &layer_bindings, origin) {
+            Some(Flow::Ignored) | None => {}
+            Some(result) => return result,
+        }
+    }
+
+    dispatch_layer_release(key, global_bindings, runtime::ChordOrigin::Global)
+        .unwrap_or(Flow::Handled)
+}
+
+fn dispatch_key_repeat(key: Key, global_bindings: &Keys) -> Flow {
+    for (id, bindings) in runtime::focus_keys() {
+        match dispatch_layer_repeat(key, &bindings, runtime::ChordOrigin::Focus(id)) {
+            Some(Flow::Ignored) | None => {}
+            Some(result) => return result,
+        }
+    }
+
+    for (id, bindings) in runtime::view_keys() {
+        match dispatch_layer_repeat(key, &bindings, runtime::ChordOrigin::View(id)) {
+            Some(Flow::Ignored) | None => {}
+            Some(result) => return result,
+        }
+    }
+
+    if runtime::capture_active() {
+        return Flow::Handled;
+    }
+
+    for (layer_id, layer_bindings) in runtime::layers() {
+        let origin = runtime::ChordOrigin::Layer(layer_id);
+        match dispatch_layer_repeat(key, &layer_bindings, origin) {
+            Some(Flow::Ignored) | None => {}
+            Some(result) => return result,
+        }
+    }
+
+    dispatch_layer_repeat(key, global_bindings, runtime::ChordOrigin::Global)
+        .unwrap_or(Flow::Handled)
+}
+
 fn dispatch_pending(key: Key, global_bindings: &Keys, pending: runtime::PendingChord) -> Flow {
     if key == Key::esc() {
         let Some(first_key) = pending.keys.first() else {
@@ -605,6 +677,19 @@ fn dispatch_layer(key: Key, bindings: &Keys, origin: runtime::ChordOrigin) -> Op
     }
 
     bindings.dispatch(key)
+}
+
+fn dispatch_layer_release(key: Key, bindings: &Keys, origin: runtime::ChordOrigin) -> Option<Flow> {
+    if let Some(pending) = runtime::pending_chord() {
+        if pending.origin == origin {
+            runtime::reset_chord();
+        }
+    }
+    bindings.dispatch_release(key)
+}
+
+fn dispatch_layer_repeat(key: Key, bindings: &Keys, _origin: runtime::ChordOrigin) -> Option<Flow> {
+    bindings.dispatch_repeat(key)
 }
 
 fn dispatch_timeout(global_bindings: &Keys) -> Flow {

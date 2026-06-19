@@ -33,9 +33,9 @@ fn App() -> impl View {
 async fn main() -> std::io::Result<()> {
     Framework::new()
         .keys(|keys| {
-            keys.bind('+', increment);
-            keys.bind('-', decrement);
-            keys.bind('q', quit);
+            keys.on_press('+', increment);
+            keys.on_press('-', decrement);
+            keys.on_press('q', quit);
         })
         .run(App)
         .await
