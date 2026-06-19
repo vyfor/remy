@@ -378,8 +378,9 @@ async fn run_loop<V: View>(
             terminal.backend_mut().flush()?;
 
             runtime::finish_focus_frame();
-            runtime::finish_mouse_frame();
         }
+
+        runtime::finish_mouse_frame();
 
         runtime::cancel_stale_chord();
         runtime::Runtime::get().executor.sweep();
@@ -418,7 +419,9 @@ async fn run_loop<V: View>(
 
         if let Some(event) = event {
             let event = event?;
-            force_render = true;
+            if !matches!(event, crossterm::event::Event::Mouse(_)) {
+                force_render = true;
+            }
             if dispatch_event(event, key_bindings, input_handlers) == Flow::Quit {
                 return Ok(());
             }
