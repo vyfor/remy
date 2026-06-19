@@ -11,7 +11,7 @@ pub trait IntoFlow {
 
 impl IntoFlow for () {
     fn into_key_result(self) -> Flow {
-        Flow::Handled
+        Flow::Ignored
     }
 }
 
