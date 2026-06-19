@@ -73,8 +73,7 @@ impl<V: View> View for CachedView<V> {
     fn render(&self, _rcx: Rcx, buf: &mut Buffer, area: Rect) {
         let rt = crate::runtime::Runtime::get();
 
-        rt.static_view_seen.lock().unwrap().insert(self.owner_id);
-        rt.static_focus_seen.lock().unwrap().insert(self.owner_id);
+        rt.static_seen.lock().unwrap().insert(self.owner_id);
 
         let mut entry = rt.component_caches.entry(self.owner_id).or_default();
 

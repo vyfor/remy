@@ -43,6 +43,9 @@ impl Keys {
         if binding.len() == 1 {
             let key = binding.first().unwrap();
             inner.single_bindings.entry(key).or_insert(action);
+        } else if !binding.is_empty() {
+            inner.chord_bindings.entry(binding).or_insert(action);
+            rebuild_chord_prefixes(inner);
         }
     }
 
@@ -65,6 +68,9 @@ impl Keys {
         if binding.len() == 1 {
             let key = binding.first().unwrap();
             inner.single_bindings.insert(key, action);
+        } else if !binding.is_empty() {
+            inner.chord_bindings.insert(binding, action);
+            rebuild_chord_prefixes(inner);
         }
     }
 
@@ -78,6 +84,90 @@ impl Keys {
         Arc::make_mut(&mut self.inner)
             .repeat_bindings
             .insert(key, action);
+    }
+
+    pub(crate) fn has_press(&self, binding: &Chord) -> bool {
+        if binding.len() == 1 {
+            let key = binding.first().unwrap();
+            self.inner.single_bindings.contains_key(&key)
+        } else {
+            self.inner.chord_bindings.contains_key(binding)
+        }
+    }
+
+    pub(crate) fn has_release(&self, key: Key) -> bool {
+        self.inner.release_bindings.contains_key(&key)
+    }
+
+    pub(crate) fn has_repeat(&self, key: Key) -> bool {
+        self.inner.repeat_bindings.contains_key(&key)
+    }
+
+    pub(crate) fn insert_press_single(&mut self, key: Key, action: Action) {
+        Arc::make_mut(&mut self.inner).single_bindings.insert(key, action);
+    }
+
+    pub(crate) fn insert_press_chord(&mut self, chord: Chord, action: Action) {
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.chord_bindings.insert(chord, action);
+        rebuild_chord_prefixes(inner);
+    }
+
+    pub(crate) fn on_press_inner_arc(&mut self, binding: &Chord, action: Action) {
+        if binding.len() == 1 {
+            let key = binding.first().unwrap();
+            self.insert_press_single(key, action);
+        } else if !binding.is_empty() {
+            self.insert_press_chord(binding.clone(), action);
+        }
+    }
+
+    pub(crate) fn on_chord_press_inner_arc(&mut self, binding: Chord, action: Action) {
+        self.insert_press_chord(binding, action);
+    }
+
+    pub(crate) fn on_release_inner(&mut self, key: Key, action: Action) {
+        Arc::make_mut(&mut self.inner)
+            .release_bindings
+            .insert(key, action);
+    }
+
+    pub(crate) fn on_repeat_inner(&mut self, key: Key, action: Action) {
+        Arc::make_mut(&mut self.inner)
+            .repeat_bindings
+            .insert(key, action);
+    }
+
+    pub(crate) fn single_binding_keys(&self) -> Vec<(Key, Action)> {
+        self.inner
+            .single_bindings
+            .iter()
+            .map(|(k, v)| (*k, Arc::clone(v)))
+            .collect()
+    }
+
+    pub(crate) fn chord_binding_keys(&self) -> Vec<(Chord, Action)> {
+        self.inner
+            .chord_bindings
+            .iter()
+            .map(|(k, v)| (k.clone(), Arc::clone(v)))
+            .collect()
+    }
+
+    pub(crate) fn release_binding_keys(&self) -> Vec<(Key, Action)> {
+        self.inner
+            .release_bindings
+            .iter()
+            .map(|(k, v)| (*k, Arc::clone(v)))
+            .collect()
+    }
+
+    pub(crate) fn repeat_binding_keys(&self) -> Vec<(Key, Action)> {
+        self.inner
+            .repeat_bindings
+            .iter()
+            .map(|(k, v)| (*k, Arc::clone(v)))
+            .collect()
     }
 
     pub fn on_press<K, F, R>(&mut self, key: K, action: F) -> &mut Self
@@ -298,12 +388,16 @@ impl Keys {
             inner.single_bindings.insert(key, action);
         } else {
             inner.chord_bindings.insert(keys, action);
-            inner.chord_prefixes.clear();
-            for keys in inner.chord_bindings.keys() {
-                for len in 1..keys.len() {
-                    inner.chord_prefixes.insert(keys.prefix(len));
-                }
-            }
+            rebuild_chord_prefixes(inner);
+        }
+    }
+}
+
+fn rebuild_chord_prefixes(inner: &mut KeysInner) {
+    inner.chord_prefixes.clear();
+    for keys in inner.chord_bindings.keys() {
+        for len in 1..keys.len() {
+            inner.chord_prefixes.insert(keys.prefix(len));
         }
     }
 }

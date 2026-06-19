@@ -55,7 +55,7 @@ pub use key::{
     add_live_view_key_press, add_live_view_key_press_arc,
     add_live_view_key_release, add_live_view_key_repeat,
     add_live_focus_key_press, add_live_focus_key_release, add_live_focus_key_repeat,
-    remove_static_keys,
+    configure_static_view_keys, remove_static_keys,
 };
 pub(crate) use key::{ChordState, FocusKeys, LayerEntry, ViewKeys};
 pub use mouse::{
@@ -94,10 +94,9 @@ pub struct Runtime {
     pub(crate) live_view_key_buf: Mutex<HashMap<OwnerId, Keys>>,
     pub(crate) live_focus_key_buf: Mutex<HashMap<(OwnerId, FocusId), Keys>>,
     // static = at setup time
-    pub(crate) static_view_keys: Mutex<HashMap<OwnerId, Keys>>,
-    pub(crate) static_focus_keys: Mutex<HashMap<(OwnerId, FocusId), Keys>>,
-    pub(crate) static_view_seen: Mutex<HashSet<OwnerId>>,
-    pub(crate) static_focus_seen: Mutex<HashSet<OwnerId>>,
+    pub(crate) static_view_keys: DashMap<OwnerId, Keys>,
+    pub(crate) static_focus_keys: DashMap<(OwnerId, FocusId), Keys>,
+    pub(crate) static_seen: Mutex<HashSet<OwnerId>>,
     pub(crate) global_keys: Mutex<Keys>,
     pub(crate) layers: Mutex<Vec<LayerEntry>>,
     next_layer: AtomicU64,
@@ -133,10 +132,9 @@ impl Runtime {
             focus_counts: Mutex::new(HashMap::new()),
             live_view_key_buf: Mutex::new(HashMap::new()),
             live_focus_key_buf: Mutex::new(HashMap::new()),
-            static_view_keys: Mutex::new(HashMap::new()),
-            static_focus_keys: Mutex::new(HashMap::new()),
-            static_view_seen: Mutex::new(HashSet::new()),
-            static_focus_seen: Mutex::new(HashSet::new()),
+            static_view_keys: DashMap::new(),
+            static_focus_keys: DashMap::new(),
+            static_seen: Mutex::new(HashSet::new()),
             global_keys: Mutex::new(Keys::new()),
             layers: Mutex::new(Vec::new()),
             next_layer: AtomicU64::new(1),

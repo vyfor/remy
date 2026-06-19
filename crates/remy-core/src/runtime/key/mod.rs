@@ -16,6 +16,7 @@ pub use layer::{
     add_live_view_key_press, add_live_view_key_press_arc,
     add_live_view_key_release, add_live_view_key_repeat,
     add_live_focus_key_press, add_live_focus_key_release, add_live_focus_key_repeat,
-    remove_static_keys, focus_keys, keys_for, layers, set_global_keys, view_keys,
+    configure_static_view_keys, remove_static_keys,
+    focus_keys, keys_for, layers, set_global_keys, view_keys,
 };
 pub(crate) use layer::{FocusKeys, LayerEntry, ViewKeys};

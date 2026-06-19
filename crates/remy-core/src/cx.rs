@@ -1,4 +1,5 @@
 use crate::focus::FocusTarget;
+use crate::key::{LiveKeys, StaticKeys};
 use crate::keyboard::{Flow, IntoBind, IntoFlow};
 use crate::mouse::RegionBuilder;
 use crate::runtime::{self, FocusId};
@@ -11,6 +12,10 @@ pub struct Cx {
 impl Cx {
     pub const fn new(owner_id: crate::tracking::OwnerId) -> Self {
         Self { owner_id }
+    }
+
+    pub fn keys(&self) -> StaticKeys {
+        StaticKeys::new(self.owner_id)
     }
 
     pub fn on_press<K, F, R>(&self, key: K, action: F)
@@ -60,6 +65,31 @@ impl Cx {
             let action = Arc::clone(&action);
             runtime::add_static_view_key_press_arc(self.owner_id, key.into_key_binding(), action);
         }
+    }
+
+    pub fn on_release_any<I, K, F, R>(&self, keys: I, action: F)
+    where
+        I: IntoIterator<Item = K>,
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        use std::sync::Arc;
+        let action: Arc<dyn Fn() -> Flow + Send + Sync> =
+            Arc::new(move || action().into_key_result());
+        for key in keys {
+            let act = Arc::clone(&action);
+            runtime::add_static_view_key_release(self.owner_id, key.into_key_binding(), move || {
+                act()
+            });
+        }
+    }
+
+    pub fn configure_keys<F>(&self, f: F)
+    where
+        F: FnOnce(&mut crate::key::Keys),
+    {
+        runtime::configure_static_view_keys(self.owner_id, f);
     }
 
     pub fn focus(self, id: impl std::hash::Hash) -> FocusTarget {
@@ -118,6 +148,10 @@ impl Rcx {
         Self { owner_id }
     }
 
+    pub fn keys(&self) -> LiveKeys {
+        LiveKeys::new(self.owner_id)
+    }
+
     pub fn on_press<K, F, R>(&self, key: K, action: F)
     where
         K: IntoBind,
@@ -164,6 +198,42 @@ impl Rcx {
         for key in keys {
             let action = Arc::clone(&action);
             runtime::add_live_view_key_press_arc(self.owner_id, key.into_key_binding(), action);
+        }
+    }
+
+    pub fn on_release_any<I, K, F, R>(&self, keys: I, action: F)
+    where
+        I: IntoIterator<Item = K>,
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        use std::sync::Arc;
+        let action: Arc<dyn Fn() -> Flow + Send + Sync> =
+            Arc::new(move || action().into_key_result());
+        for key in keys {
+            let act = Arc::clone(&action);
+            runtime::add_live_view_key_release(self.owner_id, key.into_key_binding(), move || {
+                act()
+            });
+        }
+    }
+
+    pub fn on_repeat_any<I, K, F, R>(&self, keys: I, action: F)
+    where
+        I: IntoIterator<Item = K>,
+        K: IntoBind,
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        use std::sync::Arc;
+        let action: Arc<dyn Fn() -> Flow + Send + Sync> =
+            Arc::new(move || action().into_key_result());
+        for key in keys {
+            let act = Arc::clone(&action);
+            runtime::add_live_view_key_repeat(self.owner_id, key.into_key_binding(), move || {
+                act()
+            });
         }
     }
 

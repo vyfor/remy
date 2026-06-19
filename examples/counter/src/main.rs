@@ -21,9 +21,10 @@ fn decrement() {
 
 #[component]
 fn App(cx: remy::Cx) -> impl View {
-    cx.on_press('+', increment);
-    cx.on_press('-', decrement);
-    cx.on_press('q', quit);
+    cx.keys()
+        .on_press('+', increment)
+        .on_press('-', decrement)
+        .on_press('q', quit);
 
     move |_rcx: Rcx, buf: &mut Buffer, area: Rect| {
         let widget = Paragraph::new(format!("count: {}", *counter::count))

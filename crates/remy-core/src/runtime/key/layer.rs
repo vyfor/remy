@@ -9,6 +9,8 @@ use super::chord;
 
 type Action = Arc<dyn Fn() -> Flow + Send + Sync>;
 
+const STATIC_INDEX: u32 = u32::MAX;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChordOrigin {
     Focus(FocusKey),
@@ -77,8 +79,7 @@ pub fn begin_keys() {
     rt.focus_counts.lock().unwrap().clear();
     rt.live_view_key_buf.lock().unwrap().clear();
     rt.live_focus_key_buf.lock().unwrap().clear();
-    rt.static_view_seen.lock().unwrap().clear();
-    rt.static_focus_seen.lock().unwrap().clear();
+    rt.static_seen.lock().unwrap().clear();
 }
 
 pub fn finish_keys() {
@@ -106,17 +107,12 @@ pub fn finish_keys() {
         });
     }
 
-    let view_seen = std::mem::take(&mut *rt.static_view_seen.lock().unwrap());
+    let view_seen = std::mem::take(&mut *rt.static_seen.lock().unwrap());
     rt.static_view_keys
-        .lock()
-        .unwrap()
         .retain(|owner_id, _| view_seen.contains(owner_id));
 
-    let focus_seen = std::mem::take(&mut *rt.static_focus_seen.lock().unwrap());
     rt.static_focus_keys
-        .lock()
-        .unwrap()
-        .retain(|(owner_id, _), _| focus_seen.contains(owner_id));
+        .retain(|(owner_id, _), _| view_seen.contains(owner_id));
 }
 
 pub fn add_static_view_key_press(
@@ -124,18 +120,21 @@ pub fn add_static_view_key_press(
     binding: Chord,
     action: impl Fn() -> Flow + Send + Sync + 'static,
 ) {
-    add_static_view_key_press_arc(owner_id, binding, Arc::new(action));
+    let rt = Runtime::get();
+    rt.static_seen.lock().unwrap().insert(owner_id);
+    let mut keys = rt.static_view_keys.entry(owner_id).or_default();
+    if !keys.has_press(&binding) {
+        keys.insert_press_once(binding, Arc::new(action));
+    }
 }
 
 pub fn add_static_view_key_press_arc(owner_id: OwnerId, binding: Chord, action: Action) {
     let rt = Runtime::get();
-    rt.static_view_seen.lock().unwrap().insert(owner_id);
-    rt.static_view_keys
-        .lock()
-        .unwrap()
-        .entry(owner_id)
-        .or_default()
-        .insert_press_once(binding, action);
+    rt.static_seen.lock().unwrap().insert(owner_id);
+    let mut keys = rt.static_view_keys.entry(owner_id).or_default();
+    if !keys.has_press(&binding) {
+        keys.insert_press_once(binding, action);
+    }
 }
 
 pub fn add_static_view_key_release(
@@ -144,14 +143,12 @@ pub fn add_static_view_key_release(
     action: impl Fn() -> Flow + Send + Sync + 'static,
 ) {
     let rt = Runtime::get();
-    rt.static_view_seen.lock().unwrap().insert(owner_id);
+    rt.static_seen.lock().unwrap().insert(owner_id);
     if let Some(key) = binding.first() {
-        rt.static_view_keys
-            .lock()
-            .unwrap()
-            .entry(owner_id)
-            .or_default()
-            .insert_release_once(key, Arc::new(action));
+        let mut keys = rt.static_view_keys.entry(owner_id).or_default();
+        if !keys.has_release(key) {
+            keys.insert_release_once(key, Arc::new(action));
+        }
     }
 }
 
@@ -161,14 +158,12 @@ pub fn add_static_view_key_repeat(
     action: impl Fn() -> Flow + Send + Sync + 'static,
 ) {
     let rt = Runtime::get();
-    rt.static_view_seen.lock().unwrap().insert(owner_id);
+    rt.static_seen.lock().unwrap().insert(owner_id);
     if let Some(key) = binding.first() {
-        rt.static_view_keys
-            .lock()
-            .unwrap()
-            .entry(owner_id)
-            .or_default()
-            .insert_repeat_once(key, Arc::new(action));
+        let mut keys = rt.static_view_keys.entry(owner_id).or_default();
+        if !keys.has_repeat(key) {
+            keys.insert_repeat_once(key, Arc::new(action));
+        }
     }
 }
 
@@ -179,13 +174,14 @@ pub fn add_static_focus_key_press(
     action: impl Fn() -> Flow + Send + Sync + 'static,
 ) {
     let rt = Runtime::get();
-    rt.static_focus_seen.lock().unwrap().insert(owner_id);
-    rt.static_focus_keys
-        .lock()
-        .unwrap()
+    rt.static_seen.lock().unwrap().insert(owner_id);
+    let mut keys = rt
+        .static_focus_keys
         .entry((owner_id, focus_id))
-        .or_default()
-        .insert_press_once(binding, Arc::new(action));
+        .or_default();
+    if !keys.has_press(&binding) {
+        keys.insert_press_once(binding, Arc::new(action));
+    }
 }
 
 pub fn add_static_focus_key_release(
@@ -195,14 +191,15 @@ pub fn add_static_focus_key_release(
     action: impl Fn() -> Flow + Send + Sync + 'static,
 ) {
     let rt = Runtime::get();
-    rt.static_focus_seen.lock().unwrap().insert(owner_id);
+    rt.static_seen.lock().unwrap().insert(owner_id);
     if let Some(key) = binding.first() {
-        rt.static_focus_keys
-            .lock()
-            .unwrap()
+        let mut keys = rt
+            .static_focus_keys
             .entry((owner_id, focus_id))
-            .or_default()
-            .insert_release_once(key, Arc::new(action));
+            .or_default();
+        if !keys.has_release(key) {
+            keys.insert_release_once(key, Arc::new(action));
+        }
     }
 }
 
@@ -213,14 +210,15 @@ pub fn add_static_focus_key_repeat(
     action: impl Fn() -> Flow + Send + Sync + 'static,
 ) {
     let rt = Runtime::get();
-    rt.static_focus_seen.lock().unwrap().insert(owner_id);
+    rt.static_seen.lock().unwrap().insert(owner_id);
     if let Some(key) = binding.first() {
-        rt.static_focus_keys
-            .lock()
-            .unwrap()
+        let mut keys = rt
+            .static_focus_keys
             .entry((owner_id, focus_id))
-            .or_default()
-            .insert_repeat_once(key, Arc::new(action));
+            .or_default();
+        if !keys.has_repeat(key) {
+            keys.insert_repeat_once(key, Arc::new(action));
+        }
     }
 }
 
@@ -351,11 +349,16 @@ fn remove_layer(id: LayerId) {
 
 pub fn remove_static_keys(owner_id: OwnerId) {
     let rt = Runtime::get();
-    rt.static_view_keys.lock().unwrap().remove(&owner_id);
+    rt.static_view_keys.remove(&owner_id);
     rt.static_focus_keys
-        .lock()
-        .unwrap()
         .retain(|(oid, _), _| *oid != owner_id);
+}
+
+pub fn configure_static_view_keys(owner_id: OwnerId, f: impl FnOnce(&mut Keys)) {
+    let rt = Runtime::get();
+    rt.static_seen.lock().unwrap().insert(owner_id);
+    let mut entry = rt.static_view_keys.entry(owner_id).or_default();
+    f(&mut entry);
 }
 
 pub fn layers() -> Vec<(LayerId, Keys)> {
@@ -383,8 +386,9 @@ pub fn view_keys() -> Vec<(ViewKey, Keys)> {
         .map(|entry| (entry.id, entry.keys.clone()))
         .collect();
 
-    for (owner_id, keys) in rt.static_view_keys.lock().unwrap().iter() {
-        result.push((ViewKey { owner_id: *owner_id, index: 0 }, keys.clone()));
+    for entry in rt.static_view_keys.iter() {
+        let (owner_id, keys) = (entry.key(), entry.value());
+        result.push((ViewKey { owner_id: *owner_id, index: STATIC_INDEX }, keys.clone()));
     }
 
     result
@@ -409,8 +413,8 @@ pub fn focus_keys() -> Vec<(FocusKey, Keys)> {
 
     let focused_owner = *rt.focused_owner.lock().unwrap();
     if let Some(owner_id) = focused_owner {
-        if let Some(keys) = rt.static_focus_keys.lock().unwrap().get(&(owner_id, focus_id)) {
-            result.push((FocusKey { owner_id, focus_id, index: 0 }, keys.clone()));
+        if let Some(keys) = rt.static_focus_keys.get(&(owner_id, focus_id)) {
+            result.push((FocusKey { owner_id, focus_id, index: STATIC_INDEX }, keys.clone()));
         }
     }
 
@@ -429,10 +433,8 @@ pub fn keys_for(origin: ChordOrigin) -> Option<Keys> {
             .map(|entry| entry.keys.clone())
             .or_else(|| {
                 rt.static_focus_keys
-                    .lock()
-                    .unwrap()
                     .get(&(id.owner_id, id.focus_id))
-                    .cloned()
+                    .map(|k| k.clone())
             }),
         ChordOrigin::View(id) => rt
             .view_keys
@@ -443,10 +445,8 @@ pub fn keys_for(origin: ChordOrigin) -> Option<Keys> {
             .map(|entry| entry.keys.clone())
             .or_else(|| {
                 rt.static_view_keys
-                    .lock()
-                    .unwrap()
                     .get(&id.owner_id)
-                    .cloned()
+                    .map(|k| k.clone())
             }),
         ChordOrigin::Layer(id) => rt
             .layers
@@ -476,7 +476,7 @@ pub(super) fn view_exists(id: ViewKey) -> bool {
         .unwrap()
         .iter()
         .any(|entry| entry.id == id && allows(entry.capture, cap))
-        || rt.static_view_keys.lock().unwrap().contains_key(&id.owner_id)
+        || rt.static_view_keys.contains_key(&id.owner_id)
 }
 
 pub(super) fn focus_exists(id: FocusKey) -> bool {

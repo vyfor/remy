@@ -1,0 +1,10 @@
+[package]
+name = "mouse"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+remy-tui = { workspace = true }
+tokio = { workspace = true }
