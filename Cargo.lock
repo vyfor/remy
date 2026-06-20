@@ -488,6 +488,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "drag"
+version = "0.0.1"
+dependencies = [
+ "remy-tui",
+ "tokio",
+]
+
+[[package]]
 name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

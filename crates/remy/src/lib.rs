@@ -1,6 +1,7 @@
 pub use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 pub use ratatui::layout::Position;
 pub use remy_core as core;
+pub use remy_core::Drag;
 pub use remy_core::batch;
 pub use remy_core::keyboard::quit;
 pub use remy_core::keyboard::{IntoBind, IntoFlow};

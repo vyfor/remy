@@ -5,6 +5,7 @@ members = [
     "crates/remy-core",
     "crates/remy-macros",
     "examples/counter",
+    "examples/drag",
     "examples/mouse",
 ]
 
