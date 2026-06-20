@@ -5,7 +5,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 
 use crate::cx::Rcx;
-use crate::mouse::{MouseAction, ScrollAction};
+use crate::mouse::{DragAction, MouseAction, ScrollAction};
 use crate::runtime::FocusId;
 use crate::state::SlotId;
 use crate::tracking::{OwnerId, any_slot_dirty, pop_owner, push_owner};
@@ -21,6 +21,7 @@ pub struct CachedMouseRegion {
     pub on_click: Vec<(crossterm::event::MouseButton, MouseAction)>,
     pub on_press: Vec<(crossterm::event::MouseButton, MouseAction)>,
     pub on_release: Vec<(crossterm::event::MouseButton, MouseAction)>,
+    pub on_drag: Vec<(crossterm::event::MouseButton, DragAction)>,
     pub on_scroll: Option<ScrollAction>,
 }
 

@@ -12,6 +12,7 @@ mod regions;
 
 pub(crate) type MouseAction = Arc<dyn Fn() -> Flow + Send + Sync>;
 pub(crate) type ScrollAction = Arc<dyn Fn(Scroll) -> Flow + Send + Sync>;
+pub(crate) type DragAction = Arc<dyn Fn(Drag) -> Flow + Send + Sync>;
 
 pub use region::Region;
 pub use regions::{DispatchResult, Regions};
@@ -37,6 +38,18 @@ impl Pos {
 pub struct Scroll {
     pub delta_x: i16,
     pub delta_y: i16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Drag {
+    pub button: MouseButton,
+    pub start: Pos,
+    pub previous: Pos,
+    pub current: Pos,
+    pub delta_x: i16,
+    pub delta_y: i16,
+    pub total_delta_x: i16,
+    pub total_delta_y: i16,
 }
 
 pub struct RegionBuilder {
@@ -90,6 +103,15 @@ impl RegionBuilder {
         R: IntoFlow + 'static,
     {
         self.region_mut().on_scroll(handler);
+        self
+    }
+
+    pub fn on_drag<F, R>(mut self, button: MouseButton, handler: F) -> Self
+    where
+        F: Fn(Drag) -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        self.region_mut().on_drag(button, handler);
         self
     }
 

@@ -6,18 +6,23 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use crate::runtime::FocusId;
 use crate::tracking::OwnerId;
 
-use super::{MouseAction, Pos, Region, Scroll};
+use super::{Drag, DragAction, MouseAction, Pos, Region, Scroll};
 
 pub enum DispatchResult {
     None,
     Single(MouseAction),
     Multiple(Vec<MouseAction>),
+    Drag(DragAction, Drag),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone)]
 struct PressedRegion {
     id: FocusId,
     button: MouseButton,
+    start: Pos,
+    previous: Pos,
+    dragging: bool,
+    drag_action: Option<DragAction>,
 }
 
 #[derive(Default)]
@@ -74,18 +79,24 @@ impl Regions {
         self.latest_position = Some(pos);
 
         match event.kind {
-            MouseEventKind::Moved | MouseEventKind::Drag(_) => (DispatchResult::None, false, None),
+            MouseEventKind::Moved => (DispatchResult::None, false, None),
+            MouseEventKind::Drag(button) => self.dispatch_drag(pos, active_trap, button),
             MouseEventKind::Down(button) => {
                 let region = self.hit_region(pos, active_trap).cloned();
                 if let Some(region) = region {
+                    let drag_action = region.drag_action(button);
                     self.pressed = Some(PressedRegion {
                         id: region.id,
                         button,
+                        start: pos,
+                        previous: pos,
+                        dragging: false,
+                        drag_action,
                     });
                     if let Some(action) = region.press_action(button) {
                         return (DispatchResult::Single(action), false, None);
                     }
-                    if region.has_click_interest(button) {
+                    if region.has_click_interest(button) || region.has_drag_interest(button) {
                         return (DispatchResult::None, false, None);
                     }
                 }
@@ -99,11 +110,8 @@ impl Regions {
                 };
 
                 let release_action = region.release_action(button);
-                let is_click = pressed
-                    == Some(PressedRegion {
-                        id: region.id,
-                        button,
-                    });
+                let is_click =
+                    pressed.is_some_and(|p| !p.dragging && p.id == region.id && p.button == button);
 
                 if is_click {
                     let focus = region.focus_on_click.then_some(region.owner_id).flatten();
@@ -152,6 +160,40 @@ impl Regions {
                     delta_y: 0,
                 },
             ),
+        }
+    }
+
+    fn dispatch_drag(
+        &mut self,
+        pos: Pos,
+        _active_trap: Option<&'static str>,
+        button: MouseButton,
+    ) -> (DispatchResult, bool, Option<OwnerId>) {
+        let Some(pressed) = self.pressed.as_mut() else {
+            return (DispatchResult::None, false, None);
+        };
+        if pressed.button != button {
+            return (DispatchResult::None, false, None);
+        }
+
+        let previous = pressed.previous;
+        pressed.previous = pos;
+        pressed.dragging = true;
+
+        let drag = Drag {
+            button,
+            start: pressed.start,
+            previous,
+            current: pos,
+            delta_x: pos.column as i16 - previous.column as i16,
+            delta_y: pos.row as i16 - previous.row as i16,
+            total_delta_x: pos.column as i16 - pressed.start.column as i16,
+            total_delta_y: pos.row as i16 - pressed.start.row as i16,
+        };
+
+        match pressed.drag_action.as_ref() {
+            Some(action) => (DispatchResult::Drag(Arc::clone(action), drag), false, None),
+            None => (DispatchResult::None, false, None),
         }
     }
 

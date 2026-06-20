@@ -36,6 +36,7 @@ pub fn add_mouse_region(mut region: Region, owner_id: OwnerId) {
             on_click: region.clicks.clone(),
             on_press: region.presses.clone(),
             on_release: region.releases.clone(),
+            on_drag: region.drags.clone(),
             on_scroll: region.scroll.clone(),
         };
         crate::tracking::record_mouse_region(cached);
@@ -52,6 +53,7 @@ pub fn replay_mouse_region(owner_id: OwnerId, region: &CachedMouseRegion) {
     r.clicks = region.on_click.clone();
     r.presses = region.on_press.clone();
     r.releases = region.on_release.clone();
+    r.drags = region.on_drag.clone();
     r.scroll = region.on_scroll.clone();
     add_mouse_region(r, owner_id);
 }
@@ -87,6 +89,7 @@ pub fn dispatch_mouse_event(event: &crossterm::event::MouseEvent) -> Flow {
             }
             result
         }
+        crate::mouse::DispatchResult::Drag(action, drag) => action(drag),
     };
 
     if hover_changed {

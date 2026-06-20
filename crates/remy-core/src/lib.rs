@@ -30,7 +30,7 @@ pub use framework::{Framework, Text};
 pub use keyboard::{Bind, BindKind, Chord, ChordPolicy, Flow, IntoBind, Key, Keys, Mods, quit};
 pub use load::Load;
 pub use memo::{Memo, memo};
-pub use mouse::{Pos, Region, RegionBuilder, Scroll};
+pub use mouse::{Drag, Pos, Region, RegionBuilder, Scroll};
 pub use owner::Owner;
 pub use proxy::{Init, Proxy, State, install, state};
 pub use query::{Query, QueryOpts, query};

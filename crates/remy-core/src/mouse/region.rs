@@ -7,7 +7,7 @@ use crate::keyboard::IntoFlow;
 use crate::runtime::FocusId;
 use crate::tracking::OwnerId;
 
-use super::{MouseAction, Pos, Scroll, ScrollAction};
+use super::{Drag, DragAction, MouseAction, Pos, Scroll, ScrollAction};
 
 #[derive(Clone)]
 pub struct Region {
@@ -20,6 +20,7 @@ pub struct Region {
     pub(crate) clicks: Vec<(MouseButton, MouseAction)>,
     pub(crate) presses: Vec<(MouseButton, MouseAction)>,
     pub(crate) releases: Vec<(MouseButton, MouseAction)>,
+    pub(crate) drags: Vec<(MouseButton, DragAction)>,
     pub(crate) scroll: Option<ScrollAction>,
 }
 
@@ -35,6 +36,7 @@ impl Region {
             clicks: Vec::new(),
             presses: Vec::new(),
             releases: Vec::new(),
+            drags: Vec::new(),
             scroll: None,
         }
     }
@@ -86,6 +88,17 @@ impl Region {
         self.scroll = Some(Arc::new(move |scroll| handler(scroll).into_key_result()));
     }
 
+    pub fn on_drag<F, R>(&mut self, button: MouseButton, handler: F)
+    where
+        F: Fn(Drag) -> R + Send + Sync + 'static,
+        R: IntoFlow + 'static,
+    {
+        self.drags.push((
+            button,
+            Arc::new(move |drag| handler(drag).into_key_result()),
+        ));
+    }
+
     pub(crate) fn attach_runtime(
         &mut self,
         owner_id: Option<OwnerId>,
@@ -124,7 +137,18 @@ impl Region {
         Self::button_action(&self.clicks, button)
     }
 
+    pub(crate) fn drag_action(&self, button: MouseButton) -> Option<DragAction> {
+        self.drags
+            .iter()
+            .find(|entry| entry.0 == button)
+            .map(|entry| Arc::clone(&entry.1))
+    }
+
     pub(crate) fn has_click_interest(&self, button: MouseButton) -> bool {
         self.focus_on_click || Self::button_action(&self.clicks, button).is_some()
+    }
+
+    pub(crate) fn has_drag_interest(&self, button: MouseButton) -> bool {
+        self.drag_action(button).is_some()
     }
 }
