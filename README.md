@@ -32,7 +32,7 @@ use remy::ratatui::buffer::Buffer;
 use remy::ratatui::layout::Rect;
 use remy::ratatui::prelude::Widget;
 use remy::ratatui::widgets::{Block, Borders, Paragraph};
-use remy::{Framework, State, View, component, intent, quit, state, store};
+use remy::{Framework, Rcx, State, component, intent, quit, state, store};
 
 #[store]
 pub fn counter() {
@@ -41,17 +41,22 @@ pub fn counter() {
 
 #[intent]
 fn increment() {
-    counter::count.update(|c| *count += 1);
+    counter::count.update(|c| *c += 1);
 }
 
 #[intent]
 fn decrement() {
-    counter::count.update(|c| *count -= 1);
+    counter::count.update(|c| *c -= 1);
 }
 
 #[component]
-fn App() -> impl View {
-    move |buf: &mut Buffer, area: Rect| {
+fn App(cx: remy::Cx) {
+    cx.keys()
+        .on_press('+', increment)
+        .on_press('-', decrement)
+        .on_press('q', quit);
+
+    move |_rcx: Rcx, buf: &mut Buffer, area: Rect| {
         let widget = Paragraph::new(format!("count: {}", *counter::count))
             .block(Block::new().title("counter").borders(Borders::ALL));
 
@@ -61,13 +66,6 @@ fn App() -> impl View {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    Framework::new()
-        .keys(|k| {
-            k.bind('+', increment);
-            k.bind('-', decrement);
-            k.bind('q', quit);
-        })
-        .run(App)
-        .await
+    Framework::new().run(App).await
 }
 ```
