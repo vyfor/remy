@@ -21,6 +21,7 @@ mod batch;
 mod component;
 mod effect;
 mod focus;
+mod frame_rate;
 mod global;
 mod key;
 mod mouse;
@@ -42,6 +43,7 @@ pub use focus::{
 pub(crate) use focus::{
     FocusState, active_trap_has, active_trap_id, current_frame_trap_id, remove_owner_focus,
 };
+pub use frame_rate::{frame_interval, set_frame_interval, set_frame_rate};
 pub use global::{dispatch_intent, get_global, get_global_arc, report_error};
 pub use key::{
     ChordOrigin, ExpiredChord, FocusKey, LayerHandle, LayerId, PendingChord, ViewKey, add_layer,

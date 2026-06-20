@@ -35,7 +35,9 @@ pub use owner::Owner;
 pub use proxy::{Init, Proxy, State, install, state};
 pub use query::{Query, QueryOpts, query};
 pub use resource::{Refresh, Resource, ResourceOpts, Retry, resource};
-pub use runtime::{FocusId, LayerHandle, LayerId};
+pub use runtime::{
+    FocusId, LayerHandle, LayerId, frame_interval, set_frame_interval, set_frame_rate,
+};
 pub use scope::{Scope, StoreCx};
 pub use state::{SlotId, const_slot_id};
 pub use transaction::{Transaction, transaction};
