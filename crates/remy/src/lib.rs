@@ -8,7 +8,7 @@ pub use remy_core::runtime::Runtime;
 pub use remy_core::tracking::set_cursor_position;
 pub use remy_core::{
     effect::Effect,
-    focus::{Focus, FocusTarget},
+    focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus},
     framework::Framework,
     id::Id,
     instance::{Instance, hash_props},
@@ -30,9 +30,9 @@ pub fn hide_cursor() {
 
 pub mod focus {
     pub use remy_core::focus::{
-        Focus, FocusGroup, FocusId, FocusTarget, active_group, capture, clear, current,
-        enter_group, is, leave_group, next, next_group, prev, prev_group, set,
+        clear, current, is, next, prev, set,
     };
+    pub use remy_core::runtime::FocusId;
 }
 
 pub mod keys {

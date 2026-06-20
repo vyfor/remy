@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use crate::keyboard::{Chord, ChordPolicy, Key};
 use crate::tracking::OwnerId;
 
-use crate::runtime::{Runtime, active_capture_has, active_capture_id, current_focus_id};
+use crate::runtime::{Runtime, active_trap_id, active_trap_has, current_focus_id};
 
 use super::layer::{self, ChordOrigin, LayerId, keys_for};
 
@@ -180,16 +180,16 @@ pub fn cancel_stale_chord() -> bool {
 
 pub fn chord_stale(origin: ChordOrigin) -> bool {
     match origin {
-        ChordOrigin::Global => active_capture_id().is_some(),
+        ChordOrigin::Global => active_trap_id().is_some(),
         ChordOrigin::Layer(layer_id) => {
-            active_capture_id().is_some() || !layer::layer_exists(layer_id)
+            active_trap_id().is_some() || !layer::layer_exists(layer_id)
         }
         ChordOrigin::Focus(id) => {
             if current_focus_id() != Some(id.focus_id) {
                 return true;
             }
             !layer::focus_exists(id)
-                || (active_capture_id().is_some() && !active_capture_has(id.owner_id))
+                || (active_trap_id().is_some() && !active_trap_has(id.owner_id))
         }
         ChordOrigin::View(id) => !layer::view_exists(id),
     }

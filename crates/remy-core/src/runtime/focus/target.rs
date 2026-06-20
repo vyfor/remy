@@ -1,76 +1,117 @@
+use std::sync::Arc;
+
+use crate::focus_builder::FocusEventKind;
 use crate::runtime::Runtime;
 use crate::tracking::OwnerId;
 
 use super::FocusId;
-use super::state::FocusEntry;
+use super::state::{FocusEntry, StaticFocusEvents, StaticGroup};
 
 pub fn focus_owner(owner_id: OwnerId) {
     let rt = Runtime::get();
     let focus_id = FocusId::component(owner_id);
     let mut f = rt.focus.lock().unwrap();
-    if let Some(cap_id) = f.capture_stack.last().copied() {
-        let cap = f.captures.entry(cap_id).or_default();
-        cap.desired = Some(focus_id);
-        cap.current = Some(focus_id);
-        f.active_capture = Some(cap_id);
-    } else {
-        f.desired = Some(focus_id);
-        f.current = Some(focus_id);
+    if let Some(trap_id) = f.trap_stack.last().copied() {
+        let entries = f.trap_entries.entry(trap_id).or_default();
+        if !entries.iter().any(|e| e.id == focus_id) {
+            entries.push(FocusEntry { id: focus_id, owner_id });
+        }
+        f.active_trap = Some(trap_id);
     }
+    f.desired = Some(focus_id);
+    f.current = Some(focus_id);
     drop(f);
     *rt.focused_owner.lock().unwrap() = Some(owner_id);
 }
 
-pub fn declare_focus(focus_id: FocusId, owner_id: OwnerId) -> bool {
+pub fn present_focus(owner_id: OwnerId) {
     let rt = Runtime::get();
     let mut f = rt.focus.lock().unwrap();
+    let focus_id = FocusId::component(owner_id);
 
-    if let Some(cap_id) = f.capture_stack.last().copied() {
-        f.active_capture = Some(cap_id);
-        let cap = f.captures.entry(cap_id).or_default();
-        if !cap.entries.iter().any(|entry| entry.id == focus_id) {
-            cap.entries.push(FocusEntry {
-                id: focus_id,
-                owner_id,
-            });
-        }
+    f.presented.insert(owner_id);
 
-        let should_focus = cap.desired == Some(focus_id)
-            || (cap.desired.is_none()
-                && cap.entries.first().map(|entry| entry.id) == Some(focus_id));
-        if should_focus {
-            cap.desired = Some(focus_id);
-            cap.current = Some(focus_id);
-            *rt.focused_owner.lock().unwrap() = Some(owner_id);
-        }
-        return should_focus;
+    if !f.focus_order.iter().any(|e| e.id == focus_id) {
+        f.focus_order.push(FocusEntry { id: focus_id, owner_id });
     }
 
-    if !f.entries.iter().any(|entry| entry.id == focus_id) {
-        f.entries.push(FocusEntry {
-            id: focus_id,
-            owner_id,
-        });
+    if let Some(group_id) = f.group_stack.last().copied() {
+        let entries = f.group_entries.entry(group_id).or_default();
+        if !entries.iter().any(|e| e.id == focus_id) {
+            entries.push(FocusEntry { id: focus_id, owner_id });
+        }
     }
 
-    let should_focus = f.desired == Some(focus_id)
-        || (f.desired.is_none() && f.entries.first().map(|entry| entry.id) == Some(focus_id));
-    if should_focus {
-        f.desired = Some(focus_id);
+    if let Some(trap_id) = f.trap_stack.last().copied() {
+        let entries = f.trap_entries.entry(trap_id).or_default();
+        if !entries.iter().any(|e| e.id == focus_id) {
+            entries.push(FocusEntry { id: focus_id, owner_id });
+        }
+    }
+
+    if f.current.is_none() {
         f.current = Some(focus_id);
-        *rt.focused_owner.lock().unwrap() = Some(owner_id);
+        f.desired = Some(focus_id);
     }
-    should_focus
+}
+
+pub fn add_focus_event(
+    focus_id: FocusId,
+    owner_id: OwnerId,
+    kind: FocusEventKind,
+    callback: impl Fn() + Send + Sync + 'static,
+) {
+    let rt = Runtime::get();
+    let mut f = rt.focus.lock().unwrap();
+    let events = f.static_events.entry(focus_id).or_insert(StaticFocusEvents {
+        owner_id,
+        on_focus: None,
+        on_blur: None,
+    });
+    match kind {
+        FocusEventKind::Focus => events.on_focus = Some(Arc::new(callback)),
+        FocusEventKind::Blur => events.on_blur = Some(Arc::new(callback)),
+    }
+}
+
+pub fn add_static_group_member(
+    group_id: FocusId,
+    owner_id: OwnerId,
+    member_id: FocusId,
+    wrap: bool,
+) {
+    let rt = Runtime::get();
+    let mut f = rt.focus.lock().unwrap();
+    let group = f.static_groups.entry(group_id).or_insert(StaticGroup {
+        owner_id,
+        members: Vec::new(),
+        wrap,
+    });
+    group.wrap = wrap;
+    if !group.members.contains(&member_id) {
+        group.members.push(member_id);
+    }
+}
+
+pub fn push_group(group_id: FocusId) {
+    let rt = Runtime::get();
+    rt.focus.lock().unwrap().group_stack.push(group_id);
+}
+
+pub fn pop_group() {
+    let rt = Runtime::get();
+    rt.focus.lock().unwrap().group_stack.pop();
 }
 
 pub fn current_focus_id() -> Option<FocusId> {
     let rt = Runtime::get();
     let f = rt.focus.lock().unwrap();
-    if let Some(cap_id) = f.active_capture
-        && let Some(cap) = f.captures.get(cap_id)
-        && cap.current.is_some()
+    if let Some(trap_id) = f.active_trap
+        && let Some(entries) = f.trap_entries.get(trap_id)
     {
-        return cap.current;
+        if f.current.is_some() && entries.iter().any(|e| Some(e.id) == f.current) {
+            return f.current;
+        }
     }
     f.current
 }
@@ -83,24 +124,14 @@ pub fn focus_id(focus_id: FocusId) -> bool {
     let rt = Runtime::get();
     let mut f = rt.focus.lock().unwrap();
 
-    if let Some(cap_id) = f.active_capture
-        && let Some(cap) = f.captures.get_mut(cap_id)
-        && let Some(entry) = cap
-            .entries
-            .iter()
-            .find(|entry| entry.id == focus_id)
-            .copied()
-    {
-        cap.desired = Some(focus_id);
-        cap.current = Some(focus_id);
-        *rt.focused_owner.lock().unwrap() = Some(entry.owner_id);
-        rt.dirty_notify.notify_one();
-        return true;
-    }
+    let found = f.focus_order.iter().find(|e| e.id == focus_id)
+        .or_else(|| f.group_entries.values().flatten().find(|e| e.id == focus_id))
+        .or_else(|| f.trap_entries.values().flatten().find(|e| e.id == focus_id));
 
-    if let Some(entry) = f.entries.iter().find(|entry| entry.id == focus_id).copied() {
+    if let Some(entry) = found.copied() {
         f.desired = Some(focus_id);
         f.current = Some(focus_id);
+        drop(f);
         *rt.focused_owner.lock().unwrap() = Some(entry.owner_id);
         rt.dirty_notify.notify_one();
         return true;
@@ -111,71 +142,7 @@ pub fn focus_id(focus_id: FocusId) -> bool {
 }
 
 pub fn get_focused_owner() -> Option<OwnerId> {
-    let rt = Runtime::get();
-    *rt.focused_owner.lock().unwrap()
-}
-
-pub fn declare_group(group_id: FocusId, owner_id: OwnerId) {
-    let rt = Runtime::get();
-    let mut f = rt.focus.lock().unwrap();
-
-    if !f.entries.iter().any(|entry| entry.id == group_id) {
-        f.entries.push(FocusEntry {
-            id: group_id,
-            owner_id,
-        });
-    }
-
-    let group = f.groups.entry(group_id).or_default();
-    group.owner_id = owner_id;
-    group.wrap = true;
-}
-
-pub fn declare_in_group(group_id: FocusId, child_id: FocusId, owner_id: OwnerId) -> bool {
-    let rt = Runtime::get();
-    let mut f = rt.focus.lock().unwrap();
-
-    if !f.entries.iter().any(|entry| entry.id == child_id) {
-        f.entries.push(FocusEntry {
-            id: child_id,
-            owner_id,
-        });
-    }
-
-    let group = f.groups.entry(group_id).or_default();
-    if !group.entries.iter().any(|entry| entry.id == child_id) {
-        group.entries.push(FocusEntry {
-            id: child_id,
-            owner_id,
-        });
-    }
-
-    let should_focus = f.desired == Some(child_id)
-        || (f.desired.is_none() && f.entries.first().map(|entry| entry.id) == Some(child_id));
-    if should_focus {
-        f.desired = Some(child_id);
-        f.current = Some(child_id);
-        *rt.focused_owner.lock().unwrap() = Some(owner_id);
-    }
-    should_focus
-}
-
-pub fn set_group_wrap(group_id: FocusId, wrap: bool) {
-    let rt = Runtime::get();
-    let mut f = rt.focus.lock().unwrap();
-    if let Some(group) = f.groups.get_mut(&group_id) {
-        group.wrap = wrap;
-    }
-}
-
-pub fn active_group() -> Option<FocusId> {
-    let rt = Runtime::get();
-    let f = rt.focus.lock().unwrap();
-    let current = f.current?;
-    f.groups
-        .iter()
-        .filter_map(|(id, group)| group.entries.iter().any(|e| e.id == current).then_some(*id))
-        .next()
+    *Runtime::get().focused_owner.lock().unwrap()
 }
 
 pub fn clear_focus() {
@@ -183,12 +150,8 @@ pub fn clear_focus() {
     let mut f = rt.focus.lock().unwrap();
     f.desired = None;
     f.current = None;
-    f.active_capture = None;
+    f.active_trap = None;
     f.active_group = None;
-    for cap in f.captures.values_mut() {
-        cap.desired = None;
-        cap.current = None;
-    }
     drop(f);
     *rt.focused_owner.lock().unwrap() = None;
 }
@@ -204,56 +167,29 @@ pub fn clear_focus_owner(owner_id: OwnerId) {
 pub(crate) fn remove_owner_focus(owner_id: OwnerId) {
     let rt = Runtime::get();
     let mut f = rt.focus.lock().unwrap();
-    let removed_ids: Vec<_> = f
-        .entries
-        .iter()
-        .filter(|entry| entry.owner_id == owner_id)
-        .map(|entry| entry.id)
-        .collect();
-    f.entries.retain(|entry| entry.owner_id != owner_id);
     let focus_id = FocusId::component(owner_id);
-    if f.desired == Some(focus_id) || f.desired.is_some_and(|id| removed_ids.contains(&id)) {
+
+    f.focus_order.retain(|e| e.owner_id != owner_id);
+    f.static_events.retain(|_, e| e.owner_id != owner_id);
+    f.static_groups.retain(|_, g| g.owner_id != owner_id);
+
+    for group in f.static_groups.values_mut() {
+        group.members.retain(|m| *m != focus_id);
+    }
+    for entries in f.group_entries.values_mut() {
+        entries.retain(|e| e.owner_id != owner_id);
+    }
+    for entries in f.trap_entries.values_mut() {
+        entries.retain(|e| e.owner_id != owner_id);
+    }
+
+    if f.desired == Some(focus_id) {
         f.desired = None;
     }
-    if f.current == Some(focus_id) || f.current.is_some_and(|id| removed_ids.contains(&id)) {
+    if f.current == Some(focus_id) {
         f.current = None;
     }
-    for group in f.groups.values_mut() {
-        let group_removed: Vec<_> = group
-            .entries
-            .iter()
-            .filter(|entry| entry.owner_id == owner_id)
-            .map(|entry| entry.id)
-            .collect();
-        group.entries.retain(|entry| entry.owner_id != owner_id);
-        if group.desired == Some(focus_id)
-            || group.desired.is_some_and(|id| group_removed.contains(&id))
-        {
-            group.desired = None;
-        }
-        if group.current == Some(focus_id)
-            || group.current.is_some_and(|id| group_removed.contains(&id))
-        {
-            group.current = None;
-        }
-    }
-    for cap in f.captures.values_mut() {
-        let removed_ids: Vec<_> = cap
-            .entries
-            .iter()
-            .filter(|entry| entry.owner_id == owner_id)
-            .map(|entry| entry.id)
-            .collect();
-        cap.entries.retain(|entry| entry.owner_id != owner_id);
-        if cap.desired == Some(focus_id) || cap.desired.is_some_and(|id| removed_ids.contains(&id))
-        {
-            cap.desired = None;
-        }
-        if cap.current == Some(focus_id) || cap.current.is_some_and(|id| removed_ids.contains(&id))
-        {
-            cap.current = None;
-        }
-    }
+
     drop(f);
 
     let mut focused = rt.focused_owner.lock().unwrap();

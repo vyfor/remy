@@ -1,39 +1,60 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::tracking::OwnerId;
 
 use super::FocusId;
+use crate::focus_builder::EventCallback;
 
-#[derive(Default)]
 pub(crate) struct FocusState {
-    pub(super) entries: Vec<FocusEntry>,
+    pub(super) focus_order: Vec<FocusEntry>,
+    pub(super) presented: HashSet<OwnerId>,
+    pub(super) group_stack: Vec<FocusId>,
+    pub(super) group_entries: HashMap<FocusId, Vec<FocusEntry>>,
+    pub(super) trap_stack: Vec<&'static str>,
+    pub(super) trap_entries: HashMap<&'static str, Vec<FocusEntry>>,
+    pub(super) static_events: HashMap<FocusId, StaticFocusEvents>,
+    pub(super) static_groups: HashMap<FocusId, StaticGroup>,
     pub(super) desired: Option<FocusId>,
     pub(super) current: Option<FocusId>,
-    pub(super) groups: HashMap<FocusId, FocusGroup>,
+    pub(super) previous: Option<FocusId>,
+    pub(super) active_trap: Option<&'static str>,
     pub(super) active_group: Option<FocusId>,
-    pub(super) capture_stack: Vec<&'static str>,
-    pub(super) active_capture: Option<&'static str>,
-    pub(super) captures: HashMap<&'static str, FocusScope>,
 }
 
-#[derive(Default)]
-pub(super) struct FocusGroup {
-    pub(super) entries: Vec<FocusEntry>,
-    pub(super) desired: Option<FocusId>,
-    pub(super) current: Option<FocusId>,
-    pub(super) wrap: bool,
-    pub(super) owner_id: OwnerId,
+pub(crate) struct StaticFocusEvents {
+    pub owner_id: OwnerId,
+    pub on_focus: Option<EventCallback>,
+    pub on_blur: Option<EventCallback>,
 }
 
-#[derive(Default)]
-pub(super) struct FocusScope {
-    pub(super) entries: Vec<FocusEntry>,
-    pub(super) desired: Option<FocusId>,
-    pub(super) current: Option<FocusId>,
+pub(crate) struct StaticGroup {
+    pub owner_id: OwnerId,
+    pub members: Vec<FocusId>,
+    pub wrap: bool,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct FocusEntry {
-    pub(super) id: FocusId,
-    pub(super) owner_id: OwnerId,
+pub(crate) struct FocusEntry {
+    pub(crate) id: FocusId,
+    pub(crate) owner_id: OwnerId,
+}
+
+impl Default for FocusState {
+    fn default() -> Self {
+        Self {
+            focus_order: Vec::new(),
+            presented: HashSet::new(),
+            group_stack: Vec::new(),
+            group_entries: HashMap::new(),
+            trap_stack: Vec::new(),
+            trap_entries: HashMap::new(),
+            static_events: HashMap::new(),
+            static_groups: HashMap::new(),
+            desired: None,
+            current: None,
+            previous: None,
+            active_trap: None,
+            active_group: None,
+        }
+    }
 }

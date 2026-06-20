@@ -3,6 +3,7 @@ pub mod cached;
 pub mod cx;
 pub mod effect;
 pub mod focus;
+pub mod focus_builder;
 pub mod framework;
 pub mod id;
 pub mod key;
@@ -24,7 +25,7 @@ pub mod view;
 
 pub use cached::CachedView;
 pub use cx::{Cx, Rcx};
-pub use focus::{Focus, FocusGroup, FocusTarget};
+pub use focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus};
 pub use framework::{Framework, Text};
 pub use keyboard::{Bind, BindKind, Chord, ChordPolicy, Flow, IntoBind, Key, Keys, Mods, quit};
 pub use load::Load;

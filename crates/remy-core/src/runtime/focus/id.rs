@@ -7,7 +7,7 @@ pub struct FocusId(u64);
 
 impl FocusId {
     pub fn new<T: Hash>(value: T) -> Self {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        let mut hasher = rapidhash::fast::RapidHasher::default();
         value.hash(&mut hasher);
         Self(hasher.finish())
     }

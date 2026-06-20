@@ -1,4 +1,4 @@
-use crate::focus::FocusTarget;
+use crate::focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus};
 use crate::key::{LiveKeys, StaticKeys};
 use crate::keyboard::{Flow, IntoBind, IntoFlow};
 use crate::mouse::RegionBuilder;
@@ -92,8 +92,12 @@ impl Cx {
         runtime::configure_static_view_keys(self.owner_id, f);
     }
 
-    pub fn focus(self, id: impl std::hash::Hash) -> FocusTarget {
-        FocusTarget::new(FocusId::new(id), self.owner_id)
+    pub fn focus(self) -> FocusBuilder {
+        FocusBuilder::new(self.owner_id)
+    }
+
+    pub fn focus_group(self, name: &str) -> FocusGroupBuilder {
+        FocusGroupBuilder::new(name, self.owner_id)
     }
 
     pub fn mouse_region(
@@ -144,7 +148,7 @@ pub struct Rcx {
 }
 
 impl Rcx {
-    pub(crate) fn new(owner_id: crate::tracking::OwnerId) -> Self {
+    pub fn new(owner_id: crate::tracking::OwnerId) -> Self {
         Self { owner_id }
     }
 
@@ -237,8 +241,24 @@ impl Rcx {
         }
     }
 
-    pub fn focus(self, id: impl std::hash::Hash) -> FocusTarget {
-        FocusTarget::new(FocusId::new(id), self.owner_id)
+    pub fn focus(self) -> RenderFocus {
+        RenderFocus::new(self.owner_id)
+    }
+
+    pub fn present(self) {
+        runtime::present_focus(self.owner_id)
+    }
+
+    pub fn focused(self) -> bool {
+        runtime::is_focus_id(FocusId::component(self.owner_id))
+    }
+
+    pub fn focus_group<R>(self, name: &str, body: impl FnOnce(&Self) -> R) -> R {
+        let group_id = FocusId::new(name);
+        runtime::push_group(group_id);
+        let result = body(&self);
+        runtime::pop_group();
+        result
     }
 
     pub fn mouse_region(

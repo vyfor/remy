@@ -1,94 +1,75 @@
 use crate::runtime::Runtime;
 
-use super::FocusId;
-
 pub fn begin_focus_frame() {
     let rt = Runtime::get();
     let mut f = rt.focus.lock().unwrap();
-    f.entries.clear();
+    f.focus_order.clear();
+    f.presented.clear();
+    f.group_stack.clear();
+    f.group_entries.clear();
+    f.trap_stack.clear();
+    f.trap_entries.clear();
+    f.active_trap = None;
     f.active_group = None;
-    f.groups.clear();
-    f.capture_stack.clear();
-    f.active_capture = None;
-    for cap in f.captures.values_mut() {
-        cap.entries.clear();
-        cap.current = None;
-    }
-    drop(f);
-    *rt.focused_owner.lock().unwrap() = None;
+    f.previous = f.current;
 }
 
 pub fn finish_focus_frame() {
     let rt = Runtime::get();
     let mut f = rt.focus.lock().unwrap();
-    let mut focused = rt.focused_owner.lock().unwrap();
 
-    if let Some(cap_id) = f.active_capture {
-        let Some(cap) = f.captures.get_mut(cap_id) else {
-            *focused = None;
-            return;
-        };
+    let presented_set = f.presented.clone();
+    
+    f.static_events
+        .retain(|_, e| presented_set.contains(&e.owner_id));
+    f.static_groups
+        .retain(|_, g| presented_set.contains(&g.owner_id));
 
-        if let Some(id) = *focused
-            && let Some(entry) = cap.entries.iter().find(|entry| entry.owner_id == id)
-        {
-            cap.desired = Some(entry.id);
-            cap.current = Some(entry.id);
-            return;
+    if let Some(current) = f.current {
+        let still_present = f.focus_order.iter().any(|e| e.id == current)
+            || f.group_entries.values().flatten().any(|e| e.id == current)
+            || f.trap_entries.values().flatten().any(|e| e.id == current);
+        if !still_present {
+            f.current = f.focus_order.first().map(|e| e.id);
+            f.desired = f.current;
         }
+    }
 
-        if cap.entries.is_empty() {
-            cap.desired = None;
-            cap.current = None;
-            *focused = None;
-            return;
+    if f.current.is_none() && !f.focus_order.is_empty() {
+        f.current = Some(f.focus_order[0].id);
+        f.desired = f.current;
+    }
+
+    let focused_owner = f.current.and_then(|id| {
+        f.focus_order
+            .iter()
+            .find(|e| e.id == id)
+            .or_else(|| f.group_entries.values().flatten().find(|e| e.id == id))
+            .or_else(|| f.trap_entries.values().flatten().find(|e| e.id == id))
+            .map(|e| e.owner_id)
+    });
+
+    let prev = f.previous;
+    let curr = f.current;
+
+    drop(f);
+    *rt.focused_owner.lock().unwrap() = focused_owner;
+
+    if curr != prev {
+        let f = rt.focus.lock().unwrap();
+        if let Some(prev_id) = prev {
+            if let Some(events) = f.static_events.get(&prev_id) {
+                if let Some(on_blur) = &events.on_blur {
+                    on_blur();
+                }
+            }
         }
-
-        let target_id = cap
-            .desired
-            .and_then(|id| cap.entries.iter().any(|entry| entry.id == id).then_some(id))
-            .unwrap_or(cap.entries[0].id);
-        let target = cap
-            .entries
-            .iter()
-            .find(|entry| entry.id == target_id)
-            .copied()
-            .expect("selected capture target disappeared :(");
-        cap.desired = Some(target.id);
-        cap.current = Some(target.id);
-        *focused = Some(target.owner_id);
-        return;
+        if let Some(curr_id) = curr {
+            if let Some(events) = f.static_events.get(&curr_id) {
+                if let Some(on_focus) = &events.on_focus {
+                    on_focus();
+                }
+            }
+        }
     }
-
-    if let Some(id) = *focused {
-        let focus_id = f
-            .entries
-            .iter()
-            .find(|entry| entry.owner_id == id)
-            .map(|entry| entry.id)
-            .unwrap_or_else(|| FocusId::component(id));
-        f.desired = Some(focus_id);
-        f.current = Some(focus_id);
-        return;
-    }
-
-    if f.entries.is_empty() {
-        f.desired = None;
-        f.current = None;
-        return;
-    }
-
-    let target_id = f
-        .desired
-        .and_then(|id| f.entries.iter().any(|entry| entry.id == id).then_some(id))
-        .unwrap_or(f.entries[0].id);
-    let target = f
-        .entries
-        .iter()
-        .find(|entry| entry.id == target_id)
-        .copied()
-        .expect("targetn't");
-    f.desired = Some(target.id);
-    f.current = Some(target.id);
-    *focused = Some(target.owner_id);
 }

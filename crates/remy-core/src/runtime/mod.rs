@@ -34,13 +34,13 @@ pub(crate) use component::next_id;
 pub use component::{dispose_owner, register_owner, set_active_owner, spawn_owner};
 pub use effect::{dispose_effect, register_effect, run_effect_by_id};
 pub use focus::{
-    FocusId, active_group, begin_focus_frame, capture_active, clear_focus, clear_focus_owner,
-    current_focus_id, declare_focus, declare_group, declare_in_group, finish_focus_frame,
-    focus_enter_group, focus_id, focus_leave_group, focus_next, focus_next_group, focus_owner,
-    focus_prev, focus_prev_group, get_focused_owner, is_focus_id, set_group_wrap, with_capture,
+    FocusId, focus_id, focus_next, focus_owner, focus_prev, get_focused_owner,
+    is_focus_id, present_focus, add_focus_event, add_static_group_member,
+    clear_focus, clear_focus_owner, current_focus_id, begin_focus_frame, finish_focus_frame,
+    push_group, pop_group, push_trap, pop_trap, trap_active,
 };
 pub(crate) use focus::{
-    FocusState, active_capture_has, active_capture_id, current_frame_capture_id, remove_owner_focus,
+    FocusState, active_trap_id, active_trap_has, current_frame_trap_id, remove_owner_focus,
 };
 pub use global::{dispatch_intent, get_global, get_global_arc, report_error};
 pub use key::{

@@ -1,22 +1,20 @@
-mod capture;
 mod frame;
 mod id;
 mod nav;
 mod state;
 mod target;
+mod trap;
 
-pub use capture::{capture_active, with_capture};
-pub use frame::{begin_focus_frame, finish_focus_frame};
 pub use id::FocusId;
-pub use nav::{
-    focus_enter_group, focus_leave_group, focus_next, focus_next_group, focus_prev,
-    focus_prev_group,
-};
+pub use frame::{begin_focus_frame, finish_focus_frame};
 pub use target::{
-    active_group, clear_focus, clear_focus_owner, current_focus_id, declare_focus, declare_group,
-    declare_in_group, focus_id, focus_owner, get_focused_owner, is_focus_id, set_group_wrap,
+    clear_focus, clear_focus_owner, current_focus_id, focus_id, focus_owner,
+    get_focused_owner, is_focus_id, present_focus, add_focus_event,
+    add_static_group_member, push_group, pop_group,
 };
+pub use trap::{trap_active, push_trap, pop_trap};
+pub use nav::{focus_next, focus_prev};
 
-pub(crate) use capture::{active_capture_has, active_capture_id, current_frame_capture_id};
+pub(crate) use trap::{active_trap_id, active_trap_has, current_frame_trap_id};
 pub(crate) use state::FocusState;
 pub(crate) use target::remove_owner_focus;

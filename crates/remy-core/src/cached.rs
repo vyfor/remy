@@ -89,6 +89,7 @@ impl<V: View> View for CachedView<V> {
                 && entry.children.is_empty()
             {
                 drop(entry);
+                crate::runtime::present_focus(self.owner_id);
                 return;
             }
             entry.mouse_dirty = false;
@@ -97,6 +98,7 @@ impl<V: View> View for CachedView<V> {
             let children = Arc::clone(&entry.children);
             drop(entry);
 
+            crate::runtime::present_focus(self.owner_id);
             for region in regions.iter() {
                 crate::runtime::replay_mouse_region(self.owner_id, region);
             }

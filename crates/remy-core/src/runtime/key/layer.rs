@@ -45,14 +45,14 @@ pub(crate) struct LayerEntry {
 pub(crate) struct ViewKeys {
     pub(crate) id: ViewKey,
     pub(crate) keys: Keys,
-    pub(crate) capture: Option<&'static str>,
+    pub(crate) trap: Option<&'static str>,
 }
 
 #[derive(Clone)]
 pub(crate) struct FocusKeys {
     pub(crate) id: FocusKey,
     pub(crate) keys: Keys,
-    pub(crate) capture: Option<&'static str>,
+    pub(crate) trap: Option<&'static str>,
 }
 
 pub struct LayerHandle {
@@ -92,7 +92,7 @@ pub fn finish_keys() {
         rt.view_keys.lock().unwrap().push(ViewKeys {
             id: ViewKey { owner_id, index },
             keys,
-            capture: crate::runtime::current_frame_capture_id(),
+            trap: crate::runtime::current_frame_trap_id(),
         });
     }
 
@@ -103,7 +103,7 @@ pub fn finish_keys() {
         rt.focus_keys.lock().unwrap().push(FocusKeys {
             id: FocusKey { owner_id, focus_id, index },
             keys,
-            capture: crate::runtime::current_frame_capture_id(),
+            trap: crate::runtime::current_frame_trap_id(),
         });
     }
 
@@ -373,7 +373,7 @@ pub fn layers() -> Vec<(LayerId, Keys)> {
 }
 
 pub fn view_keys() -> Vec<(ViewKey, Keys)> {
-    let cap = crate::runtime::active_capture_id();
+    let trap = crate::runtime::active_trap_id();
     let rt = Runtime::get();
 
     let mut result: Vec<_> = rt
@@ -382,7 +382,7 @@ pub fn view_keys() -> Vec<(ViewKey, Keys)> {
         .unwrap()
         .iter()
         .rev()
-        .filter(|entry| allows(entry.capture, cap))
+        .filter(|entry| allows(entry.trap, trap))
         .map(|entry| (entry.id, entry.keys.clone()))
         .collect();
 
@@ -398,7 +398,7 @@ pub fn focus_keys() -> Vec<(FocusKey, Keys)> {
     let Some(focus_id) = crate::runtime::current_focus_id() else {
         return Vec::new();
     };
-    let cap = crate::runtime::active_capture_id();
+    let trap = crate::runtime::active_trap_id();
     let rt = Runtime::get();
 
     let mut result: Vec<_> = rt
@@ -407,7 +407,7 @@ pub fn focus_keys() -> Vec<(FocusKey, Keys)> {
         .unwrap()
         .iter()
         .rev()
-        .filter(|entry| entry.id.focus_id == focus_id && allows(entry.capture, cap))
+        .filter(|entry| entry.id.focus_id == focus_id && allows(entry.trap, trap))
         .map(|entry| (entry.id, entry.keys.clone()))
         .collect();
 
@@ -469,24 +469,24 @@ pub(super) fn layer_exists(id: LayerId) -> bool {
 }
 
 pub(super) fn view_exists(id: ViewKey) -> bool {
-    let cap = crate::runtime::active_capture_id();
+    let trap = crate::runtime::active_trap_id();
     let rt = Runtime::get();
     rt.view_keys
         .lock()
         .unwrap()
         .iter()
-        .any(|entry| entry.id == id && allows(entry.capture, cap))
+        .any(|entry| entry.id == id && allows(entry.trap, trap))
         || rt.static_view_keys.contains_key(&id.owner_id)
 }
 
 pub(super) fn focus_exists(id: FocusKey) -> bool {
-    let cap = crate::runtime::active_capture_id();
+    let trap = crate::runtime::active_trap_id();
     Runtime::get()
         .focus_keys
         .lock()
         .unwrap()
         .iter()
-        .any(|entry| entry.id == id && allows(entry.capture, cap))
+        .any(|entry| entry.id == id && allows(entry.trap, trap))
 }
 
 fn next_view_index(rt: &Runtime, owner_id: OwnerId) -> u32 {
@@ -505,9 +505,9 @@ fn next_focus_index(rt: &Runtime, owner_id: OwnerId, focus_id: FocusId) -> u32 {
     current
 }
 
-fn allows(entry_capture: Option<&'static str>, active_capture: Option<&'static str>) -> bool {
-    match active_capture {
-        Some(active) => entry_capture == Some(active),
+fn allows(entry_trap: Option<&'static str>, active_trap: Option<&'static str>) -> bool {
+    match active_trap {
+        Some(active) => entry_trap == Some(active),
         None => true,
     }
 }

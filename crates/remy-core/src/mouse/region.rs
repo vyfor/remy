@@ -14,7 +14,7 @@ pub struct Region {
     pub(crate) id: FocusId,
     pub(crate) area: Rect,
     pub owner_id: Option<OwnerId>,
-    pub(crate) capture_id: Option<&'static str>,
+    pub(crate) trap_id: Option<&'static str>,
     pub focus_on_click: bool,
     pub wants_hover: bool,
     pub(crate) clicks: Vec<(MouseButton, MouseAction)>,
@@ -29,7 +29,7 @@ impl Region {
             id,
             area,
             owner_id: None,
-            capture_id: None,
+            trap_id: None,
             focus_on_click: false,
             wants_hover: false,
             clicks: Vec::new(),
@@ -89,10 +89,10 @@ impl Region {
     pub(crate) fn attach_runtime(
         &mut self,
         owner_id: Option<OwnerId>,
-        capture_id: Option<&'static str>,
+        trap_id: Option<&'static str>,
     ) {
         self.owner_id = owner_id;
-        self.capture_id = capture_id;
+        self.trap_id = trap_id;
     }
 
     pub(crate) fn contains(&self, pos: Pos) -> bool {

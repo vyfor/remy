@@ -539,7 +539,7 @@ fn dispatch_key(key: Key, global_bindings: &Keys) -> Flow {
         }
     }
 
-    if runtime::capture_active() {
+    if runtime::trap_active() {
         return Flow::Handled;
     }
 
@@ -569,7 +569,7 @@ fn dispatch_key_release(key: Key, global_bindings: &Keys) -> Flow {
         }
     }
 
-    if runtime::capture_active() {
+    if runtime::trap_active() {
         return Flow::Handled;
     }
 
@@ -600,7 +600,7 @@ fn dispatch_key_repeat(key: Key, global_bindings: &Keys) -> Flow {
         }
     }
 
-    if runtime::capture_active() {
+    if runtime::trap_active() {
         return Flow::Handled;
     }
 

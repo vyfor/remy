@@ -3,7 +3,7 @@ use crate::keyboard::Flow;
 use crate::mouse::Region;
 use crate::tracking::OwnerId;
 
-use super::{FocusId, Runtime, active_capture_id, current_frame_capture_id, focus_id};
+use super::{FocusId, Runtime, active_trap_id, current_frame_trap_id, focus_owner};
 
 pub fn begin_mouse_frame() {
     Runtime::get().mouse.lock().unwrap().begin_frame();
@@ -11,8 +11,8 @@ pub fn begin_mouse_frame() {
 
 pub fn finish_mouse_frame() {
     let rt = Runtime::get();
-    let active_cap = active_capture_id();
-    let (hover_changed, hovered_owners) = rt.mouse.lock().unwrap().finish_frame(active_cap);
+    let active = active_trap_id();
+    let (hover_changed, hovered_owners) = rt.mouse.lock().unwrap().finish_frame(active);
     for owner in &hovered_owners {
         mark_mouse_dirty(*owner);
     }
@@ -23,8 +23,8 @@ pub fn finish_mouse_frame() {
 }
 
 pub fn add_mouse_region(mut region: Region, owner_id: OwnerId) {
-    let cap_id = current_frame_capture_id();
-    region.attach_runtime(Some(owner_id), cap_id);
+    let trap_id = current_frame_trap_id();
+    region.attach_runtime(Some(owner_id), trap_id);
 
     if crate::tracking::is_capturing() && crate::tracking::capture_owner() == Some(owner_id) {
         let cached = crate::cached::CachedMouseRegion {
@@ -61,14 +61,14 @@ pub fn is_region_hovered(id: FocusId) -> bool {
 
 pub fn dispatch_mouse_event(event: &crossterm::event::MouseEvent) -> Flow {
     let rt = Runtime::get();
-    let active_cap = active_capture_id();
-    let (dispatch_result, hover_changed, focus) = {
+    let active = active_trap_id();
+    let (dispatch_result, hover_changed, focus_owner_id) = {
         let mut mouse = rt.mouse.lock().unwrap();
-        mouse.dispatch_event(event, active_cap)
+        mouse.dispatch_event(event, active)
     };
 
-    if let Some(focus) = focus {
-        focus_id(focus);
+    if let Some(owner_id) = focus_owner_id {
+        focus_owner(owner_id);
     }
 
     let result = match dispatch_result {

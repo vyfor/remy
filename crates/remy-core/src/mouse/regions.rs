@@ -44,10 +44,10 @@ impl Regions {
 
     pub fn finish_frame(
         &mut self,
-        active_capture: Option<&'static str>,
+        active_trap: Option<&'static str>,
     ) -> (bool, HashSet<OwnerId>) {
         let prev_owner = self.last_hovered_owner;
-        let hover_changed = self.recompute_hover(active_capture);
+        let hover_changed = self.recompute_hover(active_trap);
         let mut owners: HashSet<OwnerId> = HashSet::new();
         if prev_owner != self.last_hovered_owner {
             if let Some(o) = prev_owner {
@@ -71,8 +71,8 @@ impl Regions {
     pub fn dispatch_event(
         &mut self,
         event: &MouseEvent,
-        active_capture: Option<&'static str>,
-    ) -> (DispatchResult, bool, Option<FocusId>) {
+        active_trap: Option<&'static str>,
+    ) -> (DispatchResult, bool, Option<OwnerId>) {
         let pos = Pos::from_event(event);
         self.latest_position = Some(pos);
 
@@ -81,7 +81,7 @@ impl Regions {
                 (DispatchResult::None, false, None)
             }
             MouseEventKind::Down(button) => {
-                let region = self.hit_region(pos, active_capture).cloned();
+                let region = self.hit_region(pos, active_trap).cloned();
                 if let Some(region) = region {
                     self.pressed = Some(PressedRegion {
                         id: region.id,
@@ -97,7 +97,7 @@ impl Regions {
                 (DispatchResult::None, false, None)
             }
             MouseEventKind::Up(button) => {
-                let region = self.hit_region(pos, active_capture).cloned();
+                let region = self.hit_region(pos, active_trap).cloned();
                 let pressed = self.pressed.take();
                 let Some(region) = region else {
                     return (DispatchResult::None, false, None);
@@ -111,7 +111,7 @@ impl Regions {
                     });
 
                 if is_click {
-                    let focus = region.focus_on_click.then_some(region.id);
+                    let focus = region.focus_on_click.then_some(region.owner_id).flatten();
                     let click_action = region.click_action(button);
                     let actions: Vec<_> = release_action
                         .into_iter()
@@ -130,22 +130,22 @@ impl Regions {
             }
             MouseEventKind::ScrollUp => self.dispatch_scroll(
                 pos,
-                active_capture,
+                active_trap,
                 Scroll { delta_x: 0, delta_y: 1 },
             ),
             MouseEventKind::ScrollDown => self.dispatch_scroll(
                 pos,
-                active_capture,
+                active_trap,
                 Scroll { delta_x: 0, delta_y: -1 },
             ),
             MouseEventKind::ScrollLeft => self.dispatch_scroll(
                 pos,
-                active_capture,
+                active_trap,
                 Scroll { delta_x: -1, delta_y: 0 },
             ),
             MouseEventKind::ScrollRight => self.dispatch_scroll(
                 pos,
-                active_capture,
+                active_trap,
                 Scroll { delta_x: 1, delta_y: 0 },
             ),
         }
@@ -154,11 +154,11 @@ impl Regions {
     fn dispatch_scroll(
         &self,
         pos: Pos,
-        active_capture: Option<&'static str>,
+        active_trap: Option<&'static str>,
         scroll: Scroll,
-    ) -> (DispatchResult, bool, Option<FocusId>) {
+    ) -> (DispatchResult, bool, Option<OwnerId>) {
         let handler = self
-            .hit_region(pos, active_capture)
+            .hit_region(pos, active_trap)
             .and_then(|region| region.scroll.clone());
 
         match handler {
@@ -170,14 +170,14 @@ impl Regions {
         }
     }
 
-    fn recompute_hover(&mut self, active_capture: Option<&'static str>) -> bool {
+    fn recompute_hover(&mut self, active_trap: Option<&'static str>) -> bool {
         let hovered = self.latest_position.and_then(|pos| {
             self.regions
                 .iter()
                 .rev()
                 .find(|region| {
                     region.wants_hover
-                        && Self::capture_allows(region.capture_id, active_capture)
+                        && Self::trap_allows(region.trap_id, active_trap)
                         && region.contains(pos)
                 })
                 .map(|region| region.id)
@@ -196,18 +196,18 @@ impl Regions {
         true
     }
 
-    fn hit_region(&self, pos: Pos, active_capture: Option<&'static str>) -> Option<&Region> {
+    fn hit_region(&self, pos: Pos, active_trap: Option<&'static str>) -> Option<&Region> {
         self.regions.iter().rev().find(|region| {
-            Self::capture_allows(region.capture_id, active_capture) && region.contains(pos)
+            Self::trap_allows(region.trap_id, active_trap) && region.contains(pos)
         })
     }
 
-    fn capture_allows(
-        region_capture: Option<&'static str>,
-        active_capture: Option<&'static str>,
+    fn trap_allows(
+        region_trap: Option<&'static str>,
+        active_trap: Option<&'static str>,
     ) -> bool {
-        match active_capture {
-            Some(active) => region_capture == Some(active),
+        match active_trap {
+            Some(active) => region_trap == Some(active),
             None => true,
         }
     }
