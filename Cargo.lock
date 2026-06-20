@@ -251,7 +251,7 @@ dependencies = [
 
 [[package]]
 name = "counter"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "remy-tui",
  "tokio",
@@ -489,7 +489,7 @@ dependencies = [
 
 [[package]]
 name = "drag"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "remy-tui",
  "tokio",
@@ -958,7 +958,7 @@ dependencies = [
 
 [[package]]
 name = "mouse"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "remy-tui",
  "tokio",
@@ -1455,7 +1455,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "remy-core"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "arc-swap",
  "criterion",
@@ -1471,7 +1471,7 @@ dependencies = [
 
 [[package]]
 name = "remy-macros"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1480,7 +1480,7 @@ dependencies = [
 
 [[package]]
 name = "remy-tui"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "crossterm",
  "linkme",

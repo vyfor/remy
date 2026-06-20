@@ -22,7 +22,7 @@ in the movie, **remy** is the little rat who hides under chef linguini's hat, pu
 ## usage
 
 ```toml
-remy-tui = "0.0.1"
+remy-tui = "0.1.0"
 ```
 
 ## examples

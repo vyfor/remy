@@ -18,11 +18,11 @@ linkme = { workspace = true }
 dashmap = { workspace = true }
 arc-swap = { workspace = true }
 futures-util = { workspace = true }
-smallvec = "1"
-rapidhash = "4.4.1"
+smallvec = { workspace = true }
+rapidhash = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.8"
+criterion = { workspace = true }
 
 [[bench]]
 name = "cache"
