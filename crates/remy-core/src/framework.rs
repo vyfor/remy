@@ -402,10 +402,7 @@ fn dispatch_event(event: Event, key_bindings: &Keys, input_handlers: &Inputs) ->
     match event {
         Event::Key(key) if key.kind == KeyEventKind::Press => {
             if let Some(ch) = char_from_ev(&key) {
-                match input_handlers.text(Text::Char(ch)) {
-                    Flow::Ignored => {}
-                    result => return result,
-                }
+                input_handlers.text(Text::Char(ch));
             }
             if let Some(key) = Key::from_event(key) {
                 dispatch_key(key, key_bindings)
