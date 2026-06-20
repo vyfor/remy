@@ -26,7 +26,7 @@ pub mod view;
 pub use cached::CachedView;
 pub use cx::{Cx, Rcx};
 pub use focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus};
-pub use framework::{Framework, Text};
+pub use framework::Framework;
 pub use keyboard::{Bind, BindKind, Chord, ChordPolicy, Flow, IntoBind, Key, Keys, Mods, quit};
 pub use load::Load;
 pub use memo::{Memo, memo};

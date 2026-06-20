@@ -23,12 +23,6 @@ use crate::runtime;
 use crate::scope::Globals;
 use crate::view::View;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Text {
-    Char(char),
-    Paste(String),
-}
-
 pub struct Framework {
     globals: Globals,
     key_bindings: Keys,
@@ -38,7 +32,7 @@ pub struct Framework {
 type ResizeHandler = Arc<dyn Fn(u16, u16) -> Flow + Send + Sync>;
 type KeyHandler = Arc<dyn Fn(Key) -> Flow + Send + Sync>;
 type PasteHandler = Arc<dyn Fn(String) -> Flow + Send + Sync>;
-type TextInputHandler = Arc<dyn Fn(Text) -> Flow + Send + Sync>;
+type CharHandler = Arc<dyn Fn(char) -> Flow + Send + Sync>;
 type MouseHandler = Arc<dyn Fn(MouseEvent) -> Flow + Send + Sync>;
 
 #[derive(Clone, Default)]
@@ -47,7 +41,7 @@ struct Inputs {
     key_repeat: Option<KeyHandler>,
     key_release: Option<KeyHandler>,
     paste: Option<PasteHandler>,
-    text_input: Option<TextInputHandler>,
+    char_input: Option<CharHandler>,
     mouse: Option<MouseHandler>,
     mouse_regions: bool,
 }
@@ -62,7 +56,7 @@ impl Inputs {
     }
 
     fn wants_paste(&self) -> bool {
-        self.paste.is_some() || self.text_input.is_some()
+        self.paste.is_some() || self.char_input.is_some()
     }
 
     fn resize(&self, columns: u16, rows: u16) -> Flow {
@@ -93,10 +87,10 @@ impl Inputs {
             .unwrap_or(Flow::Ignored)
     }
 
-    fn text(&self, input: Text) -> Flow {
-        self.text_input
+    fn char(&self, ch: char) -> Flow {
+        self.char_input
             .as_ref()
-            .map(|handler| handler(input))
+            .map(|handler| handler(ch))
             .unwrap_or(Flow::Ignored)
     }
 
@@ -178,13 +172,12 @@ impl Framework {
         self
     }
 
-    pub fn on_text_input<F, R>(mut self, handler: F) -> Self
+    pub fn on_char<F, R>(mut self, handler: F) -> Self
     where
-        F: Fn(Text) -> R + Send + Sync + 'static,
+        F: Fn(char) -> R + Send + Sync + 'static,
         R: IntoFlow + 'static,
     {
-        self.input_handlers.text_input =
-            Some(Arc::new(move |input| handler(input).into_key_result()));
+        self.input_handlers.char_input = Some(Arc::new(move |ch| handler(ch).into_key_result()));
         self
     }
 
@@ -449,7 +442,7 @@ fn dispatch_event(event: Event, key_bindings: &Keys, input_handlers: &Inputs) ->
     match event {
         Event::Key(key) if key.kind == KeyEventKind::Press => {
             if let Some(ch) = char_from_ev(&key) {
-                input_handlers.text(Text::Char(ch));
+                input_handlers.char(ch);
             }
             if let Some(key) = Key::from_event(key) {
                 dispatch_key(key, key_bindings)
@@ -482,10 +475,7 @@ fn dispatch_event(event: Event, key_bindings: &Keys, input_handlers: &Inputs) ->
             }
         }
         Event::Resize(columns, rows) => input_handlers.resize(columns, rows),
-        Event::Paste(text) => match input_handlers.text(Text::Paste(text.clone())) {
-            Flow::Ignored => input_handlers.paste(text),
-            result => result,
-        },
+        Event::Paste(text) => input_handlers.paste(text),
         Event::Mouse(event) => dispatch_mouse(event, input_handlers),
         _ => Flow::Ignored,
     }
