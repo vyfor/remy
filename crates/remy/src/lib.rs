@@ -3,9 +3,12 @@ pub use ratatui::layout::Position;
 pub use remy_core as core;
 pub use remy_core::Drag;
 pub use remy_core::batch;
+pub use remy_core::frame_interval;
 pub use remy_core::keyboard::quit;
 pub use remy_core::keyboard::{IntoBind, IntoFlow};
 pub use remy_core::runtime::Runtime;
+pub use remy_core::set_frame_interval;
+pub use remy_core::set_frame_rate;
 pub use remy_core::tracking::set_cursor_position;
 pub use remy_core::{
     Cx, Memo, Query, Rcx, Resource, State,

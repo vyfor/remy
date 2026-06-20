@@ -135,6 +135,11 @@ impl Framework {
         self
     }
 
+    pub fn frame_rate(self, fps: u32) -> Self {
+        runtime::set_frame_rate(fps);
+        self
+    }
+
     pub fn on_resize<F, R>(mut self, handler: F) -> Self
     where
         F: Fn(u16, u16) -> R + Send + Sync + 'static,
@@ -253,8 +258,7 @@ async fn run_loop<V: View>(
 ) -> io::Result<()> {
     // todo: possibly make adjustable?
     const EVENT_DRAIN_BUDGET: usize = 64;
-    // todo: make dynamic
-    const FRAME_BUDGET: Duration = Duration::from_millis(16);
+    let frame_budget = runtime::frame_interval();
     runtime::set_global_keys(key_bindings.clone());
 
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<io::Result<Event>>();
@@ -395,7 +399,7 @@ async fn run_loop<V: View>(
         let chord_was_pending = runtime::pending_chord().is_some();
 
         let timeout = if needs_draw {
-            let frame_rem = FRAME_BUDGET.saturating_sub(frame_start.elapsed());
+            let frame_rem = frame_budget.saturating_sub(frame_start.elapsed());
             let chord =
                 runtime::chord_deadline().map(|d| d.saturating_duration_since(Instant::now()));
             chord.unwrap_or(frame_rem).min(frame_rem)
