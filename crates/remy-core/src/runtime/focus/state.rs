@@ -5,6 +5,7 @@ use crate::tracking::OwnerId;
 use super::FocusId;
 use crate::focus_builder::EventCallback;
 
+#[derive(Default)]
 pub(crate) struct FocusState {
     pub(super) focus_order: Vec<FocusEntry>,
     pub(super) presented: HashSet<OwnerId>,
@@ -37,24 +38,4 @@ pub(crate) struct StaticGroup {
 pub(crate) struct FocusEntry {
     pub(crate) id: FocusId,
     pub(crate) owner_id: OwnerId,
-}
-
-impl Default for FocusState {
-    fn default() -> Self {
-        Self {
-            focus_order: Vec::new(),
-            presented: HashSet::new(),
-            group_stack: Vec::new(),
-            group_entries: HashMap::new(),
-            trap_stack: Vec::new(),
-            trap_entries: HashMap::new(),
-            static_events: HashMap::new(),
-            static_groups: HashMap::new(),
-            desired: None,
-            current: None,
-            previous: None,
-            active_trap: None,
-            active_group: None,
-        }
-    }
 }

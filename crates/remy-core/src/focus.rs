@@ -1,5 +1,5 @@
-pub use crate::runtime::FocusId;
 pub use crate::focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus};
+pub use crate::runtime::FocusId;
 
 use crate::keyboard::Flow;
 use crate::runtime;

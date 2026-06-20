@@ -8,8 +8,8 @@ use crate::cx::Rcx;
 use crate::mouse::{MouseAction, ScrollAction};
 use crate::runtime::FocusId;
 use crate::state::SlotId;
+use crate::tracking::{OwnerId, any_slot_dirty, pop_owner, push_owner};
 use crate::tracking::{clear_area, is_area_cleared, mark_cleared};
-use crate::tracking::{any_slot_dirty, pop_owner, push_owner, OwnerId};
 use crate::view::View;
 
 #[derive(Clone)]

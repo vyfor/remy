@@ -11,6 +11,5 @@ impl<F: Fn(Rcx, &mut ratatui::buffer::Buffer, ratatui::layout::Rect)> View for F
 }
 
 impl View for () {
-    fn render(&self, _rcx: Rcx, _buf: &mut ratatui::buffer::Buffer, _area: ratatui::layout::Rect) {
-    }
+    fn render(&self, _rcx: Rcx, _buf: &mut ratatui::buffer::Buffer, _area: ratatui::layout::Rect) {}
 }

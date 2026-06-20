@@ -80,7 +80,8 @@ pub fn flush_render_reads() {
     let rt = Runtime::get();
     let slots: HashSet<SlotId> = reads.into_iter().collect();
     *rt.rendered_slots.lock().unwrap() = slots;
-    rt.has_rendered.store(true, std::sync::atomic::Ordering::Relaxed);
+    rt.has_rendered
+        .store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
 pub fn should_render(dirty_slots: &[SlotId]) -> bool {

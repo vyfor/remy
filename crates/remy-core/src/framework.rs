@@ -10,8 +10,8 @@ use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
-use ratatui::backend::Backend;
 use ratatui::Terminal;
+use ratatui::backend::Backend;
 use ratatui::backend::CrosstermBackend;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -279,8 +279,10 @@ async fn run_loop<V: View>(
         let dirty_slots = runtime::apply_commits();
 
         let mouse_changed = runtime::take_mouse_changed();
-        let needs_draw =
-            force_render || runtime::take_redraw() || mouse_changed || runtime::should_render(&dirty_slots);
+        let needs_draw = force_render
+            || runtime::take_redraw()
+            || mouse_changed
+            || runtime::should_render(&dirty_slots);
         force_render = false;
 
         if needs_draw {
@@ -347,16 +349,15 @@ async fn run_loop<V: View>(
 
                 if !changes.is_empty() {
                     let backend = terminal.backend_mut();
-                    backend.draw(changes.iter().map(|&(c, r)| {
-                        (c, r, comp.cell((c, r)).expect("in bounds"))
-                    }))?;
+                    backend.draw(
+                        changes
+                            .iter()
+                            .map(|&(c, r)| (c, r, comp.cell((c, r)).expect("in bounds"))),
+                    )?;
                 }
 
                 for (c, r) in &changes {
-                    if let (Some(src), Some(dst)) = (
-                        comp.cell((*c, *r)),
-                        prev.cell_mut((*c, *r)),
-                    ) {
+                    if let (Some(src), Some(dst)) = (comp.cell((*c, *r)), prev.cell_mut((*c, *r))) {
                         *dst = src.clone();
                     }
                 }
@@ -682,10 +683,10 @@ fn dispatch_layer(key: Key, bindings: &Keys, origin: runtime::ChordOrigin) -> Op
 }
 
 fn dispatch_layer_release(key: Key, bindings: &Keys, origin: runtime::ChordOrigin) -> Option<Flow> {
-    if let Some(pending) = runtime::pending_chord() {
-        if pending.origin == origin {
-            runtime::reset_chord();
-        }
+    if let Some(pending) = runtime::pending_chord()
+        && pending.origin == origin
+    {
+        runtime::reset_chord();
     }
     bindings.dispatch_release(key)
 }

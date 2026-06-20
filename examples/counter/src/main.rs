@@ -2,7 +2,7 @@ use remy::ratatui::buffer::Buffer;
 use remy::ratatui::layout::Rect;
 use remy::ratatui::prelude::Widget;
 use remy::ratatui::widgets::{Block, Borders, Paragraph};
-use remy::{Framework, Rcx, State, View, component, intent, quit, state, store};
+use remy::{Framework, Rcx, State, component, intent, quit, state, store};
 
 #[store]
 pub fn counter() {

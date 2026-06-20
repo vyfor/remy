@@ -19,7 +19,7 @@ pub fn finish_focus_frame() {
     let mut f = rt.focus.lock().unwrap();
 
     let presented_set = f.presented.clone();
-    
+
     f.static_events
         .retain(|_, e| presented_set.contains(&e.owner_id));
     f.static_groups
@@ -57,19 +57,17 @@ pub fn finish_focus_frame() {
 
     if curr != prev {
         let f = rt.focus.lock().unwrap();
-        if let Some(prev_id) = prev {
-            if let Some(events) = f.static_events.get(&prev_id) {
-                if let Some(on_blur) = &events.on_blur {
-                    on_blur();
-                }
-            }
+        if let Some(prev_id) = prev
+            && let Some(events) = f.static_events.get(&prev_id)
+            && let Some(on_blur) = &events.on_blur
+        {
+            on_blur();
         }
-        if let Some(curr_id) = curr {
-            if let Some(events) = f.static_events.get(&curr_id) {
-                if let Some(on_focus) = &events.on_focus {
-                    on_focus();
-                }
-            }
+        if let Some(curr_id) = curr
+            && let Some(events) = f.static_events.get(&curr_id)
+            && let Some(on_focus) = &events.on_focus
+        {
+            on_focus();
         }
     }
 }

@@ -4,8 +4,8 @@ use std::sync::Arc;
 use ratatui::layout::Rect;
 
 use crate::cached::{CachedOverlay, OverlayRenderFn};
-use crate::tracking::{capture_owner, is_capturing, record_overlay};
 use crate::tracking::OwnerId;
+use crate::tracking::{capture_owner, is_capturing, record_overlay};
 
 pub type OverlayRender = OverlayRenderFn;
 

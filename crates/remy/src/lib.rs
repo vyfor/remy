@@ -7,14 +7,15 @@ pub use remy_core::keyboard::{IntoBind, IntoFlow};
 pub use remy_core::runtime::Runtime;
 pub use remy_core::tracking::set_cursor_position;
 pub use remy_core::{
+    Cx, Memo, Query, Rcx, Resource, State,
     effect::Effect,
     focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus},
     framework::Framework,
     id::Id,
     instance::{Instance, hash_props},
+    memo, query, resource, state,
     transaction::transaction,
     view::View,
-    Cx, Rcx, State, state,
 };
 pub use remy_core::{INTENT_REGISTRY, STORE_REGISTRY};
 pub use remy_core::{bus, effect, runtime, tracking};
@@ -29,9 +30,7 @@ pub fn hide_cursor() {
 }
 
 pub mod focus {
-    pub use remy_core::focus::{
-        clear, current, is, next, prev, set,
-    };
+    pub use remy_core::focus::{clear, current, is, next, prev, set};
     pub use remy_core::runtime::FocusId;
 }
 

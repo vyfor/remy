@@ -28,10 +28,8 @@ impl StaticKeys {
     {
         let binding = key.into_key_binding();
         if !self.entry.has_press(&binding) {
-            self.entry.insert_press_once(
-                binding,
-                Arc::new(move || action().into_key_result()),
-            );
+            self.entry
+                .insert_press_once(binding, Arc::new(move || action().into_key_result()));
         }
         self
     }
@@ -43,11 +41,11 @@ impl StaticKeys {
         R: IntoFlow + 'static,
     {
         let binding = key.into_key_binding();
-        if let Some(k) = binding.first() {
-            if !self.entry.has_release(k) {
-                self.entry
-                    .insert_release_once(k, Arc::new(move || action().into_key_result()));
-            }
+        if let Some(k) = binding.first()
+            && !self.entry.has_release(k)
+        {
+            self.entry
+                .insert_release_once(k, Arc::new(move || action().into_key_result()));
         }
         self
     }
@@ -59,11 +57,11 @@ impl StaticKeys {
         R: IntoFlow + 'static,
     {
         let binding = key.into_key_binding();
-        if let Some(k) = binding.first() {
-            if !self.entry.has_repeat(k) {
-                self.entry
-                    .insert_repeat_once(k, Arc::new(move || action().into_key_result()));
-            }
+        if let Some(k) = binding.first()
+            && !self.entry.has_repeat(k)
+        {
+            self.entry
+                .insert_repeat_once(k, Arc::new(move || action().into_key_result()));
         }
         self
     }
@@ -99,10 +97,10 @@ impl StaticKeys {
         for key in keys {
             let act = Arc::clone(&action);
             let binding = key.into_key_binding();
-            if let Some(k) = binding.first() {
-                if !self.entry.has_release(k) {
-                    self.entry.insert_release_once(k, act);
-                }
+            if let Some(k) = binding.first()
+                && !self.entry.has_release(k)
+            {
+                self.entry.insert_release_once(k, act);
             }
         }
         self
@@ -120,10 +118,10 @@ impl StaticKeys {
         for key in keys {
             let act = Arc::clone(&action);
             let binding = key.into_key_binding();
-            if let Some(k) = binding.first() {
-                if !self.entry.has_repeat(k) {
-                    self.entry.insert_repeat_once(k, act);
-                }
+            if let Some(k) = binding.first()
+                && !self.entry.has_repeat(k)
+            {
+                self.entry.insert_repeat_once(k, act);
             }
         }
         self

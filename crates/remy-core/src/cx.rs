@@ -79,9 +79,11 @@ impl Cx {
             Arc::new(move || action().into_key_result());
         for key in keys {
             let act = Arc::clone(&action);
-            runtime::add_static_view_key_release(self.owner_id, key.into_key_binding(), move || {
-                act()
-            });
+            runtime::add_static_view_key_release(
+                self.owner_id,
+                key.into_key_binding(),
+                move || act(),
+            );
         }
     }
 
@@ -112,9 +114,9 @@ impl Cx {
         self,
         rect: ratatui::layout::Rect,
         render: impl Fn(Rcx, &mut ratatui::buffer::Buffer, ratatui::layout::Rect)
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ) {
         let owner_id = self.owner_id;
         runtime::push_overlay_from_cx(self.owner_id, rect, move |buf, area| {
@@ -235,9 +237,7 @@ impl Rcx {
             Arc::new(move || action().into_key_result());
         for key in keys {
             let act = Arc::clone(&action);
-            runtime::add_live_view_key_repeat(self.owner_id, key.into_key_binding(), move || {
-                act()
-            });
+            runtime::add_live_view_key_repeat(self.owner_id, key.into_key_binding(), move || act());
         }
     }
 
@@ -273,9 +273,9 @@ impl Rcx {
         self,
         rect: ratatui::layout::Rect,
         render: impl Fn(Rcx, &mut ratatui::buffer::Buffer, ratatui::layout::Rect)
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ) {
         let owner_id = self.owner_id;
         runtime::push_overlay_from_cx(self.owner_id, rect, move |buf, area| {

@@ -104,7 +104,9 @@ impl Keys {
     }
 
     pub(crate) fn insert_press_single(&mut self, key: Key, action: Action) {
-        Arc::make_mut(&mut self.inner).single_bindings.insert(key, action);
+        Arc::make_mut(&mut self.inner)
+            .single_bindings
+            .insert(key, action);
     }
 
     pub(crate) fn insert_press_chord(&mut self, chord: Chord, action: Action) {
@@ -353,7 +355,10 @@ impl Keys {
     }
 
     pub fn labels(&self) -> Vec<String> {
-        self.descriptions().into_iter().map(|info| info.label).collect()
+        self.descriptions()
+            .into_iter()
+            .map(|info| info.label)
+            .collect()
     }
 
     pub fn descriptions(&self) -> Vec<Bind> {

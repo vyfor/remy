@@ -14,7 +14,10 @@ pub fn focus_owner(owner_id: OwnerId) {
     if let Some(trap_id) = f.trap_stack.last().copied() {
         let entries = f.trap_entries.entry(trap_id).or_default();
         if !entries.iter().any(|e| e.id == focus_id) {
-            entries.push(FocusEntry { id: focus_id, owner_id });
+            entries.push(FocusEntry {
+                id: focus_id,
+                owner_id,
+            });
         }
         f.active_trap = Some(trap_id);
     }
@@ -32,20 +35,29 @@ pub fn present_focus(owner_id: OwnerId) {
     f.presented.insert(owner_id);
 
     if !f.focus_order.iter().any(|e| e.id == focus_id) {
-        f.focus_order.push(FocusEntry { id: focus_id, owner_id });
+        f.focus_order.push(FocusEntry {
+            id: focus_id,
+            owner_id,
+        });
     }
 
     if let Some(group_id) = f.group_stack.last().copied() {
         let entries = f.group_entries.entry(group_id).or_default();
         if !entries.iter().any(|e| e.id == focus_id) {
-            entries.push(FocusEntry { id: focus_id, owner_id });
+            entries.push(FocusEntry {
+                id: focus_id,
+                owner_id,
+            });
         }
     }
 
     if let Some(trap_id) = f.trap_stack.last().copied() {
         let entries = f.trap_entries.entry(trap_id).or_default();
         if !entries.iter().any(|e| e.id == focus_id) {
-            entries.push(FocusEntry { id: focus_id, owner_id });
+            entries.push(FocusEntry {
+                id: focus_id,
+                owner_id,
+            });
         }
     }
 
@@ -63,11 +75,14 @@ pub fn add_focus_event(
 ) {
     let rt = Runtime::get();
     let mut f = rt.focus.lock().unwrap();
-    let events = f.static_events.entry(focus_id).or_insert(StaticFocusEvents {
-        owner_id,
-        on_focus: None,
-        on_blur: None,
-    });
+    let events = f
+        .static_events
+        .entry(focus_id)
+        .or_insert(StaticFocusEvents {
+            owner_id,
+            on_focus: None,
+            on_blur: None,
+        });
     match kind {
         FocusEventKind::Focus => events.on_focus = Some(Arc::new(callback)),
         FocusEventKind::Blur => events.on_blur = Some(Arc::new(callback)),
@@ -108,10 +123,10 @@ pub fn current_focus_id() -> Option<FocusId> {
     let f = rt.focus.lock().unwrap();
     if let Some(trap_id) = f.active_trap
         && let Some(entries) = f.trap_entries.get(trap_id)
+        && f.current.is_some()
+        && entries.iter().any(|e| Some(e.id) == f.current)
     {
-        if f.current.is_some() && entries.iter().any(|e| Some(e.id) == f.current) {
-            return f.current;
-        }
+        return f.current;
     }
     f.current
 }
@@ -124,8 +139,16 @@ pub fn focus_id(focus_id: FocusId) -> bool {
     let rt = Runtime::get();
     let mut f = rt.focus.lock().unwrap();
 
-    let found = f.focus_order.iter().find(|e| e.id == focus_id)
-        .or_else(|| f.group_entries.values().flatten().find(|e| e.id == focus_id))
+    let found = f
+        .focus_order
+        .iter()
+        .find(|e| e.id == focus_id)
+        .or_else(|| {
+            f.group_entries
+                .values()
+                .flatten()
+                .find(|e| e.id == focus_id)
+        })
         .or_else(|| f.trap_entries.values().flatten().find(|e| e.id == focus_id));
 
     if let Some(entry) = found.copied() {

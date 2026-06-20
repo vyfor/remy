@@ -42,10 +42,7 @@ impl Regions {
         self.hovered == Some(id)
     }
 
-    pub fn finish_frame(
-        &mut self,
-        active_trap: Option<&'static str>,
-    ) -> (bool, HashSet<OwnerId>) {
+    pub fn finish_frame(&mut self, active_trap: Option<&'static str>) -> (bool, HashSet<OwnerId>) {
         let prev_owner = self.last_hovered_owner;
         let hover_changed = self.recompute_hover(active_trap);
         let mut owners: HashSet<OwnerId> = HashSet::new();
@@ -77,9 +74,7 @@ impl Regions {
         self.latest_position = Some(pos);
 
         match event.kind {
-            MouseEventKind::Moved | MouseEventKind::Drag(_) => {
-                (DispatchResult::None, false, None)
-            }
+            MouseEventKind::Moved | MouseEventKind::Drag(_) => (DispatchResult::None, false, None),
             MouseEventKind::Down(button) => {
                 let region = self.hit_region(pos, active_trap).cloned();
                 if let Some(region) = region {
@@ -113,10 +108,7 @@ impl Regions {
                 if is_click {
                     let focus = region.focus_on_click.then_some(region.owner_id).flatten();
                     let click_action = region.click_action(button);
-                    let actions: Vec<_> = release_action
-                        .into_iter()
-                        .chain(click_action)
-                        .collect();
+                    let actions: Vec<_> = release_action.into_iter().chain(click_action).collect();
                     if actions.is_empty() && region.focus_on_click {
                         return (DispatchResult::None, false, focus);
                     }
@@ -131,22 +123,34 @@ impl Regions {
             MouseEventKind::ScrollUp => self.dispatch_scroll(
                 pos,
                 active_trap,
-                Scroll { delta_x: 0, delta_y: 1 },
+                Scroll {
+                    delta_x: 0,
+                    delta_y: 1,
+                },
             ),
             MouseEventKind::ScrollDown => self.dispatch_scroll(
                 pos,
                 active_trap,
-                Scroll { delta_x: 0, delta_y: -1 },
+                Scroll {
+                    delta_x: 0,
+                    delta_y: -1,
+                },
             ),
             MouseEventKind::ScrollLeft => self.dispatch_scroll(
                 pos,
                 active_trap,
-                Scroll { delta_x: -1, delta_y: 0 },
+                Scroll {
+                    delta_x: -1,
+                    delta_y: 0,
+                },
             ),
             MouseEventKind::ScrollRight => self.dispatch_scroll(
                 pos,
                 active_trap,
-                Scroll { delta_x: 1, delta_y: 0 },
+                Scroll {
+                    delta_x: 1,
+                    delta_y: 0,
+                },
             ),
         }
     }
@@ -197,15 +201,13 @@ impl Regions {
     }
 
     fn hit_region(&self, pos: Pos, active_trap: Option<&'static str>) -> Option<&Region> {
-        self.regions.iter().rev().find(|region| {
-            Self::trap_allows(region.trap_id, active_trap) && region.contains(pos)
-        })
+        self.regions
+            .iter()
+            .rev()
+            .find(|region| Self::trap_allows(region.trap_id, active_trap) && region.contains(pos))
     }
 
-    fn trap_allows(
-        region_trap: Option<&'static str>,
-        active_trap: Option<&'static str>,
-    ) -> bool {
+    fn trap_allows(region_trap: Option<&'static str>, active_trap: Option<&'static str>) -> bool {
         match active_trap {
             Some(active) => region_trap == Some(active),
             None => true,

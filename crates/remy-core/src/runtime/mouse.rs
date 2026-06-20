@@ -17,7 +17,8 @@ pub fn finish_mouse_frame() {
         mark_mouse_dirty(*owner);
     }
     if hover_changed {
-        rt.mouse_changed.store(true, std::sync::atomic::Ordering::Relaxed);
+        rt.mouse_changed
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         rt.dirty_notify.notify_one();
     }
 }

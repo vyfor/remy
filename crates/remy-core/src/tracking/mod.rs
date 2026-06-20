@@ -80,7 +80,9 @@ pub fn pop_owner() -> OwnerFrame {
         if let Some(parent) = stack.borrow_mut().last_mut() {
             parent.children.extend(frame.own.iter().copied());
             parent.children.extend(frame.children.iter().copied());
-            parent.rendered_children.extend(frame.rendered_children.iter().copied());
+            parent
+                .rendered_children
+                .extend(frame.rendered_children.iter().copied());
         }
     });
     frame

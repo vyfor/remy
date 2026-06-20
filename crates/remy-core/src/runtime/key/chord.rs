@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use crate::keyboard::{Chord, ChordPolicy, Key};
 use crate::tracking::OwnerId;
 
-use crate::runtime::{Runtime, active_trap_id, active_trap_has, current_focus_id};
+use crate::runtime::{Runtime, active_trap_has, active_trap_id, current_focus_id};
 
 use super::layer::{self, ChordOrigin, LayerId, keys_for};
 

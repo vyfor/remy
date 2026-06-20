@@ -41,7 +41,7 @@ fn analyze_params(func: &mut ItemFn) -> ParamAnalysis {
     let mut cx_binding = None;
     let mut id_param = None;
     let mut props = Vec::new();
-    
+
     let inputs = std::mem::take(&mut func.sig.inputs);
     let mut kept_inputs = syn::punctuated::Punctuated::new();
 
@@ -76,16 +76,14 @@ fn analyze_params(func: &mut ItemFn) -> ParamAnalysis {
 
         let is_id = match &*pat_type.ty {
             Type::Path(path) => is_ident(&path.path, "Id"),
-            Type::ImplTrait(impl_trait) => {
-                impl_trait.bounds.iter().any(|b| {
-                    if let syn::TypeParamBound::Trait(tr) = b {
-                        let path = &tr.path;
-                        path.segments.last().is_some_and(|seg| seg.ident == "Into")
-                    } else {
-                        false
-                    }
-                })
-            }
+            Type::ImplTrait(impl_trait) => impl_trait.bounds.iter().any(|b| {
+                if let syn::TypeParamBound::Trait(tr) = b {
+                    let path = &tr.path;
+                    path.segments.last().is_some_and(|seg| seg.ident == "Into")
+                } else {
+                    false
+                }
+            }),
             _ => false,
         };
 
@@ -127,14 +125,16 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let analysis = analyze_params(&mut func);
-    let cx_binding = analysis.cx_binding.unwrap_or_else(|| quote! {
-        let cx = ::remy::Cx::new(__owner_id);
+    let cx_binding = analysis.cx_binding.unwrap_or_else(|| {
+        quote! {
+            let cx = ::remy::Cx::new(__owner_id);
+        }
     });
 
     let fn_name = &func.sig.ident;
     let fn_name_str = fn_name.to_string();
     let existing_stmts = &func.block.stmts;
-    
+
     if !no_cache {
         func.sig.output = syn::parse2(quote! { -> ::remy::Instance }).unwrap();
     }
@@ -204,7 +204,7 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
         }
     } else if !has_id && prop_count > 0 {
         let prop_names = analysis.props.iter().map(|(id, _)| id);
-        
+
         quote! {
             {
                 static __OWNER_ID: ::std::sync::OnceLock<::remy::core::tracking::OwnerId> =
@@ -314,7 +314,7 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         let (id_name, _) = analysis.id_param.as_ref().unwrap();
         let prop_names = analysis.props.iter().map(|(id, _)| id);
-        
+
         quote! {
             {
                 static __OWNER_ID: ::std::sync::OnceLock<::remy::core::tracking::OwnerId> =
@@ -387,11 +387,10 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
     let component_name = quote! { concat!(module_path!(), "::", #fn_name_str) };
     let reg_static_name = quote::format_ident!("__REG_OWNER_{}", fn_name);
 
-    
     quote! {
         #[allow(non_snake_case)]
         #func
-        
+
         #[::remy::linkme::distributed_slice(::remy::core::OWNER_REGISTRY)]
         #[linkme(crate = ::remy::linkme)]
         #[doc(hidden)]

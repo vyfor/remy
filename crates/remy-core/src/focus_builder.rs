@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use crate::id::Id;
 use crate::keyboard::{IntoBind, IntoFlow};
 use crate::runtime::{self, FocusId};
 use crate::tracking::OwnerId;
-use crate::id::Id;
 
 pub struct FocusBuilder {
     id: FocusId,

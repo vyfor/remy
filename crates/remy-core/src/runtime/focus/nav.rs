@@ -16,7 +16,11 @@ fn move_focus(delta: isize) -> bool {
     let mut f = rt.focus.lock().unwrap();
 
     if let Some(trap_id) = f.active_trap.or_else(|| f.trap_stack.last().copied()) {
-        let entries = f.trap_entries.get(&trap_id).map(|v| v.as_slice()).unwrap_or(&[]);
+        let entries = f
+            .trap_entries
+            .get(&trap_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
         if entries.is_empty() {
             return false;
         }
@@ -31,8 +35,16 @@ fn move_focus(delta: isize) -> bool {
 
     let current_group = f.active_group.or_else(|| group_of(&f));
     if let Some(group_id) = current_group {
-        let wrap = f.static_groups.get(&group_id).map(|g| g.wrap).unwrap_or(true);
-        let entries = f.group_entries.get(&group_id).map(|v| v.as_slice()).unwrap_or(&[]);
+        let wrap = f
+            .static_groups
+            .get(&group_id)
+            .map(|g| g.wrap)
+            .unwrap_or(true);
+        let entries = f
+            .group_entries
+            .get(&group_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
         if !entries.is_empty() {
             let (idx, target) = step_in(entries, f.desired.or(f.current), delta, wrap);
             if idx.is_some() {
@@ -52,16 +64,14 @@ fn move_focus(delta: isize) -> bool {
     }
     let (_, target) = step_in(&f.focus_order, f.desired.or(f.current), delta, true);
 
-    if f.static_groups.contains_key(&target.id)
-        || f.group_entries.contains_key(&target.id)
-    {
+    if f.static_groups.contains_key(&target.id) || f.group_entries.contains_key(&target.id) {
         f.active_group = Some(target.id);
         let first_entry = f
             .group_entries
             .get(&target.id)
             .and_then(|e| e.first())
             .copied();
-        
+
         if let Some(first) = first_entry {
             f.desired = Some(first.id);
             f.current = Some(first.id);

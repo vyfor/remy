@@ -101,7 +101,11 @@ pub fn finish_keys() {
     for ((owner_id, focus_id), keys) in live_focus {
         let index = next_focus_index(rt, owner_id, focus_id);
         rt.focus_keys.lock().unwrap().push(FocusKeys {
-            id: FocusKey { owner_id, focus_id, index },
+            id: FocusKey {
+                owner_id,
+                focus_id,
+                index,
+            },
             keys,
             trap: crate::runtime::current_frame_trap_id(),
         });
@@ -350,8 +354,7 @@ fn remove_layer(id: LayerId) {
 pub fn remove_static_keys(owner_id: OwnerId) {
     let rt = Runtime::get();
     rt.static_view_keys.remove(&owner_id);
-    rt.static_focus_keys
-        .retain(|(oid, _), _| *oid != owner_id);
+    rt.static_focus_keys.retain(|(oid, _), _| *oid != owner_id);
 }
 
 pub fn configure_static_view_keys(owner_id: OwnerId, f: impl FnOnce(&mut Keys)) {
@@ -388,7 +391,13 @@ pub fn view_keys() -> Vec<(ViewKey, Keys)> {
 
     for entry in rt.static_view_keys.iter() {
         let (owner_id, keys) = (entry.key(), entry.value());
-        result.push((ViewKey { owner_id: *owner_id, index: STATIC_INDEX }, keys.clone()));
+        result.push((
+            ViewKey {
+                owner_id: *owner_id,
+                index: STATIC_INDEX,
+            },
+            keys.clone(),
+        ));
     }
 
     result
@@ -412,10 +421,17 @@ pub fn focus_keys() -> Vec<(FocusKey, Keys)> {
         .collect();
 
     let focused_owner = *rt.focused_owner.lock().unwrap();
-    if let Some(owner_id) = focused_owner {
-        if let Some(keys) = rt.static_focus_keys.get(&(owner_id, focus_id)) {
-            result.push((FocusKey { owner_id, focus_id, index: STATIC_INDEX }, keys.clone()));
-        }
+    if let Some(owner_id) = focused_owner
+        && let Some(keys) = rt.static_focus_keys.get(&(owner_id, focus_id))
+    {
+        result.push((
+            FocusKey {
+                owner_id,
+                focus_id,
+                index: STATIC_INDEX,
+            },
+            keys.clone(),
+        ));
     }
 
     result
@@ -443,11 +459,7 @@ pub fn keys_for(origin: ChordOrigin) -> Option<Keys> {
             .iter()
             .find(|entry| entry.id == id)
             .map(|entry| entry.keys.clone())
-            .or_else(|| {
-                rt.static_view_keys
-                    .get(&id.owner_id)
-                    .map(|k| k.clone())
-            }),
+            .or_else(|| rt.static_view_keys.get(&id.owner_id).map(|k| k.clone())),
         ChordOrigin::Layer(id) => rt
             .layers
             .lock()
