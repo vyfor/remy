@@ -9,18 +9,15 @@ use super::{Resource, ResourceOpts, Retry};
 
 pub struct ResourceInit<F, T, E> {
     source: F,
+    placeholder: Option<T>,
     options: ResourceOpts,
-    _phantom: PhantomData<(T, E)>,
+    _phantom: PhantomData<E>,
 }
 
 impl<F, T, E> ResourceInit<F, T, E> {
-    pub fn initial(self, initial: T) -> ResourceSeed<F, T, E> {
-        ResourceSeed {
-            source: self.source,
-            initial,
-            options: self.options,
-            _phantom: PhantomData,
-        }
+    pub fn placeholder(mut self, value: T) -> Self {
+        self.placeholder = Some(value);
+        self
     }
 
     pub fn retry(mut self, policy: Retry) -> Self {
@@ -34,26 +31,7 @@ impl<F, T, E> ResourceInit<F, T, E> {
     }
 }
 
-pub struct ResourceSeed<F, T, E> {
-    source: F,
-    initial: T,
-    options: ResourceOpts,
-    _phantom: PhantomData<(T, E)>,
-}
-
-impl<F, T, E> ResourceSeed<F, T, E> {
-    pub fn retry(mut self, policy: Retry) -> Self {
-        self.options = self.options.retry(policy);
-        self
-    }
-
-    pub fn refresh_every(mut self, period: Duration) -> Self {
-        self.options = self.options.refresh_every(period);
-        self
-    }
-}
-
-impl<F, Fut, T, E> Init<Resource<T, E>> for ResourceSeed<F, T, E>
+impl<F, Fut, T, E> Init<Resource<T, E>> for ResourceInit<F, T, E>
 where
     F: Fn() -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<T, E>> + Send + 'static,
@@ -61,7 +39,7 @@ where
     E: Send + Sync + Clone + 'static,
 {
     fn install(self, handle: &'static Resource<T, E>, _cx: Scope) {
-        handle.install_with(self.source, self.initial, self.options);
+        handle.install_with(self.source, self.placeholder, self.options);
     }
 }
 
@@ -74,6 +52,7 @@ where
 {
     ResourceInit {
         source,
+        placeholder: None,
         options: ResourceOpts::default(),
         _phantom: PhantomData,
     }

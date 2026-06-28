@@ -5,7 +5,7 @@ mod opts;
 mod policy;
 
 pub use handle::Resource;
-pub use init::{ResourceInit, ResourceSeed, resource};
+pub use init::{ResourceInit, resource};
 pub use opts::ResourceOpts;
 pub use policy::{Refresh, Retry};
 

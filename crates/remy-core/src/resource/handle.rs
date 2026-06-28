@@ -20,22 +20,22 @@ impl<T: 'static, E: 'static> Resource<T, E> {
 }
 
 impl<T: Send + Sync + Clone + 'static, E: Send + Sync + Clone + 'static> Resource<T, E> {
-    pub fn install<F, Fut>(&self, source: F, initial: T)
+    pub fn install<F, Fut>(&self, source: F, placeholder: Option<T>)
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<T, E>> + Send + 'static,
     {
-        self.install_with(source, initial, ResourceOpts::default());
+        self.install_with(source, placeholder, ResourceOpts::default());
     }
 
-    pub fn install_with<F, Fut>(&self, source: F, initial: T, options: ResourceOpts)
+    pub fn install_with<F, Fut>(&self, source: F, placeholder: Option<T>, options: ResourceOpts)
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<T, E>> + Send + 'static,
     {
-        let inner = ResourceInner::allocate(source, initial, options);
+        let inner = ResourceInner::allocate(source, placeholder, options);
         if self.inner.set(inner).is_err() {
-            panic!("Resource::install called twice on the same slot");
+            panic!("resource installed twice");
         }
     }
 }
@@ -44,18 +44,14 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> Resource<T, E> {
     fn inner_ref(&self) -> &ResourceInner<T, E> {
         self.inner
             .get()
-            .expect("resource access before run() init phase")
+            .expect("resource read before init")
     }
 
-    pub fn latest(&self) -> &T {
-        self.data()
-    }
-
-    pub fn data(&self) -> &T {
+    pub fn latest(&self) -> Option<&T> {
         let inner = self.inner_ref();
         runtime::track_read(inner.data_slot);
         let slot: &Option<T> = runtime::read_current(inner.data_slot);
-        slot.as_ref().unwrap_or(&inner.initial)
+        slot.as_ref().or(inner.placeholder.as_ref())
     }
 
     pub fn value(&self) -> Option<&T> {
@@ -65,14 +61,6 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> Resource<T, E> {
         let inner = self.inner_ref();
         runtime::track_read(inner.data_slot);
         runtime::read_current::<Option<T>>(inner.data_slot).as_ref()
-    }
-
-    pub fn map_value<R>(&self, f: impl FnOnce(&T) -> R) -> Option<R> {
-        self.value().map(f)
-    }
-
-    pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        f(self.data())
     }
 
     pub fn status(&self) -> Load {
@@ -113,14 +101,6 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> Resource<T, E> {
 
     pub fn is_settled(&self) -> bool {
         self.status().is_settled()
-    }
-
-    pub fn loading(&self) -> bool {
-        self.is_loading()
-    }
-
-    pub fn stale(&self) -> bool {
-        self.is_refreshing()
     }
 
     pub fn error(&self) -> Option<&E> {
@@ -168,30 +148,11 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> Resource<T, E> {
 }
 
 impl<T: Send + Sync + Clone + 'static, E: Send + Sync + 'static> Resource<T, E> {
-    pub fn value_or(&self, fallback: T) -> T {
-        self.value().cloned().unwrap_or(fallback)
-    }
-
-    pub fn value_or_else(&self, fallback: impl FnOnce() -> T) -> T {
-        self.value().cloned().unwrap_or_else(fallback)
-    }
-}
-
-impl<T: Send + Sync + 'static, E: Send + Sync + 'static> std::ops::Deref for Resource<T, E> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        self.data()
-    }
-}
-
-impl<T: Send + Sync + Clone + 'static, E: Send + Sync + 'static> Resource<T, E> {
     pub fn mutate(&self, f: impl FnOnce(&mut T)) {
         let inner = self.inner_ref();
-        let mut owned: T = runtime::read_current::<Option<T>>(inner.data_slot)
-            .as_ref()
-            .expect("mutate called before any fetch was completed")
-            .clone();
+        let Some(mut owned) = runtime::read_current::<Option<T>>(inner.data_slot).clone() else {
+            return;
+        };
 
         let snapshot = owned.clone();
         inner.shadow.store(Some(Arc::new(snapshot)));

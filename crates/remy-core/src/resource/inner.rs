@@ -34,12 +34,12 @@ pub(super) struct ResourceInner<T: 'static, E: 'static> {
     pub(super) shadow: ArcSwapOption<T>,
     pub(super) fetch_id: u32,
     pub(super) effect_id: EffectId,
-    pub(super) initial: T,
+    pub(super) placeholder: Option<T>,
     _phantom: PhantomData<E>,
 }
 
 impl<T: Send + Sync + Clone + 'static, E: Send + Sync + Clone + 'static> ResourceInner<T, E> {
-    pub(super) fn allocate<F, Fut>(source: F, initial: T, options: ResourceOpts) -> Self
+    pub(super) fn allocate<F, Fut>(source: F, placeholder: Option<T>, options: ResourceOpts) -> Self
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<T, E>> + Send + 'static,
@@ -51,7 +51,7 @@ impl<T: Send + Sync + Clone + 'static, E: Send + Sync + Clone + 'static> Resourc
         let status_slot = runtime::next_slot_id();
         let has_value_slot = runtime::next_slot_id();
 
-        runtime::allocate_slot(data_slot, Some(initial.clone()));
+        runtime::allocate_slot(data_slot, None::<T>);
         runtime::allocate_slot(loading_slot, false);
         runtime::allocate_slot(stale_slot, false);
         runtime::allocate_slot(error_slot, None::<E>);
@@ -171,7 +171,7 @@ impl<T: Send + Sync + Clone + 'static, E: Send + Sync + Clone + 'static> Resourc
             shadow: ArcSwapOption::empty(),
             fetch_id,
             effect_id,
-            initial,
+            placeholder,
             _phantom: PhantomData,
         }
     }
