@@ -30,16 +30,16 @@ where
         &self,
         key_fn: KeyFn,
         fetch: FetchFn,
-        initial: T,
+        placeholder: Option<T>,
         options: QueryOpts,
     ) where
         KeyFn: Fn() -> K + Send + Sync + 'static,
         FetchFn: Fn(K) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<T, E>> + Send + 'static,
     {
-        let inner = QueryInner::allocate(key_fn, fetch, initial, options);
+        let inner = QueryInner::allocate(key_fn, fetch, placeholder, options);
         if self.inner.set(inner).is_err() {
-            panic!("Query::install called twice on the same slot");
+            panic!("query installed twice");
         }
     }
 }
@@ -48,18 +48,14 @@ impl<K: Send + Sync + 'static, T: Send + Sync + 'static, E: Send + Sync + 'stati
     fn inner_ref(&self) -> &QueryInner<K, T, E> {
         self.inner
             .get()
-            .expect("query access before run() init phase")
+            .expect("query read before init")
     }
 
-    pub fn latest(&self) -> &T {
-        self.data()
-    }
-
-    pub fn data(&self) -> &T {
+    pub fn latest(&self) -> Option<&T> {
         let inner = self.inner_ref();
         runtime::track_read(inner.data_slot);
         let slot: &Option<T> = runtime::read_current(inner.data_slot);
-        slot.as_ref().unwrap_or(&inner.initial)
+        slot.as_ref().or(inner.placeholder.as_ref())
     }
 
     pub fn value(&self) -> Option<&T> {
@@ -69,14 +65,6 @@ impl<K: Send + Sync + 'static, T: Send + Sync + 'static, E: Send + Sync + 'stati
         let inner = self.inner_ref();
         runtime::track_read(inner.data_slot);
         runtime::read_current::<Option<T>>(inner.data_slot).as_ref()
-    }
-
-    pub fn map_value<R>(&self, f: impl FnOnce(&T) -> R) -> Option<R> {
-        self.value().map(f)
-    }
-
-    pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        f(self.data())
     }
 
     pub fn status(&self) -> Load {
@@ -119,14 +107,6 @@ impl<K: Send + Sync + 'static, T: Send + Sync + 'static, E: Send + Sync + 'stati
         self.status().is_settled()
     }
 
-    pub fn loading(&self) -> bool {
-        self.is_loading()
-    }
-
-    pub fn stale(&self) -> bool {
-        self.is_refreshing()
-    }
-
     pub fn error(&self) -> Option<&E> {
         let inner = self.inner_ref();
         runtime::track_read(inner.error_slot);
@@ -158,24 +138,3 @@ impl<K: Send + Sync + 'static, T: Send + Sync + 'static, E: Send + Sync + 'stati
     }
 }
 
-impl<K: Send + Sync + 'static, T: Send + Sync + Clone + 'static, E: Send + Sync + 'static>
-    Query<K, T, E>
-{
-    pub fn value_or(&self, fallback: T) -> T {
-        self.value().cloned().unwrap_or(fallback)
-    }
-
-    pub fn value_or_else(&self, fallback: impl FnOnce() -> T) -> T {
-        self.value().cloned().unwrap_or_else(fallback)
-    }
-}
-
-impl<K: Send + Sync + 'static, T: Send + Sync + 'static, E: Send + Sync + 'static> std::ops::Deref
-    for Query<K, T, E>
-{
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        self.data()
-    }
-}

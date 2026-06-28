@@ -24,7 +24,7 @@ pub(super) struct QueryInner<K: 'static, T: 'static, E: 'static> {
     pub(super) has_value_slot: SlotId,
     pub(super) fetch_id: u32,
     pub(super) effect_id: EffectId,
-    pub(super) initial: T,
+    pub(super) placeholder: Option<T>,
     pub(super) in_flight: Arc<Mutex<Option<K>>>,
     _phantom: PhantomData<E>,
 }
@@ -44,7 +44,7 @@ where
     pub(super) fn allocate<KeyFn, FetchFn, Fut>(
         key_fn: KeyFn,
         fetch: FetchFn,
-        initial: T,
+        placeholder: Option<T>,
         options: QueryOpts,
     ) -> Self
     where
@@ -59,7 +59,7 @@ where
         let status_slot = runtime::next_slot_id();
         let has_value_slot = runtime::next_slot_id();
 
-        runtime::allocate_slot(data_slot, Some(initial.clone()));
+        runtime::allocate_slot(data_slot, None::<T>);
         runtime::allocate_slot(loading_slot, false);
         runtime::allocate_slot(stale_slot, false);
         runtime::allocate_slot(error_slot, None::<E>);
@@ -177,7 +177,7 @@ where
             has_value_slot,
             fetch_id,
             effect_id,
-            initial,
+            placeholder,
             in_flight,
             _phantom: PhantomData,
         }
