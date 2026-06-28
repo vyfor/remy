@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Expr, ExprCall, ItemFn, Local, Pat, Stmt, Type, parse2};
+use syn::{Expr, ItemFn, Local, Pat, Stmt, Type, parse2};
 
 fn type_name_is(ty: &Type, name: &str) -> bool {
     if let Type::Path(type_path) = ty
@@ -36,7 +36,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
 
     let mut slot_declarations = Vec::new();
     let mut slot_inits = Vec::new();
-    let mut sync_body = None;
+    let mut init_body = Vec::new();
 
     for stmt in &func.block.stmts {
         match stmt {
@@ -109,25 +109,20 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
                     }
                 }
             }
-            Stmt::Expr(expr, _semi) => {
-                if let Some(body) = extract_sync_block(expr) {
-                    sync_body = Some(body);
-                }
+            other => {
+                init_body.push(other.clone());
             }
-            _ => {}
         }
     }
 
-    let sync_init = sync_body
-        .map(|body| {
-            quote! {
-                {
-                    let app = ::remy::core::App::with_owner(__store_owner());
-                    #body
-                }
-            }
-        })
-        .unwrap_or_default();
+    let init_section = if init_body.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            let app = ::remy::core::App::with_owner(__store_owner());
+            #(#init_body)*
+        }
+    };
 
     quote! {
         #vis mod #mod_name {
@@ -149,7 +144,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
             #[doc(hidden)]
             pub fn __init_store(__cx: ::remy::core::App) {
                 #(#slot_inits)*
-                #sync_init
+                #init_section
             }
 
             #[::remy::linkme::distributed_slice(::remy::core::STORE_REGISTRY)]
@@ -180,22 +175,4 @@ fn parse_let(local: &Local) -> Option<(syn::Ident, Type, Expr)> {
 
 fn is_resource_type(ty: &Type) -> bool {
     type_name_is(ty, "Resource")
-}
-
-fn extract_sync_block(expr: &Expr) -> Option<TokenStream> {
-    if let Expr::Call(call) = expr
-        && is_sync_call(call)
-        && let Some(arg) = call.args.first()
-        && let Expr::Closure(closure) = arg
-    {
-        let body = &closure.body;
-        return Some(quote! { #body });
-    }
-    None
-}
-
-fn is_sync_call(call: &ExprCall) -> bool {
-    let func = &call.func;
-    let func_str = quote!(#func).to_string();
-    func_str.contains("sync")
 }
