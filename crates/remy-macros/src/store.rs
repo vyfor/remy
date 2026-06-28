@@ -110,8 +110,8 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
 
                         slot_declarations.push(quote! {
                             #[allow(non_upper_case_globals)]
-                            pub static #var_name: ::remy::core::Proxy<#var_type> =
-                                ::remy::core::Proxy::new(#slot_id_expr);
+                            pub static #var_name: ::remy::core::State<#var_type> =
+                                ::remy::core::State::new(#slot_id_expr);
 
                             #[::remy::linkme::distributed_slice(::remy::core::SLOT_REGISTRY)]
                             #[linkme(crate = ::remy::linkme)]

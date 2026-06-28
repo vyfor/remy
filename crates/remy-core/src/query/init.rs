@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use crate::proxy::Init;
+use crate::handle::Init;
 use crate::scope::Scope;
 
 use super::{Query, QueryOpts};

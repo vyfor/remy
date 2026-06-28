@@ -2,7 +2,7 @@ use std::any::Any;
 use std::sync::Arc;
 
 use crate::bus::{Commit, Op};
-use crate::proxy::Proxy;
+use crate::handle::State;
 use crate::state::SlotId;
 
 #[derive(Default)]
@@ -15,20 +15,20 @@ impl Transaction {
         Self::default()
     }
 
-    pub fn set<T>(&mut self, proxy: impl Into<Proxy<T>>, value: T) -> &mut Self
+    pub fn set<T>(&mut self, handle: State<T>, value: T) -> &mut Self
     where
         T: Send + Sync + 'static,
     {
-        self.push_set(proxy.into().id(), value);
+        self.push_set(handle.id(), value);
         self
     }
 
-    pub fn update<T, F>(&mut self, proxy: impl Into<Proxy<T>>, f: F) -> &mut Self
+    pub fn update<T, F>(&mut self, handle: State<T>, f: F) -> &mut Self
     where
         T: Send + Sync + Clone + 'static,
         F: FnOnce(&mut T) + Send + 'static,
     {
-        self.push_update::<T, F>(proxy.into().id(), f);
+        self.push_update::<T, F>(handle.id(), f);
         self
     }
 

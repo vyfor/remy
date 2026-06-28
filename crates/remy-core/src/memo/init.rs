@@ -1,4 +1,4 @@
-use crate::proxy::Init;
+use crate::handle::Init;
 use crate::scope::Scope;
 
 use super::Memo;
