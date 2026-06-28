@@ -1,13 +1,13 @@
 use crate::INTENT_REGISTRY;
 use crate::bus::IntentId;
-use crate::scope::Scope;
+use crate::app::App;
 
 use super::Runtime;
 
 pub fn dispatch_intent(intent_id: IntentId, payload: Box<dyn std::any::Any + Send>) {
     for (id, handler) in INTENT_REGISTRY {
         if *id == intent_id {
-            handler(Scope::new(), payload);
+            handler(App::new(), payload);
             return;
         }
     }

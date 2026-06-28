@@ -10,7 +10,7 @@ use crate::cached::ComponentCache;
 use crate::effect::Effects;
 use crate::keyboard::Keys;
 use crate::mouse::Regions;
-use crate::scope::{Globals, Scope};
+use crate::app::{App, Globals};
 use crate::state::{SlotId, Slots};
 use crate::tracking::OwnerId;
 
@@ -171,9 +171,9 @@ fn init_stores() {
     }
 
     crate::check_slot_collisions();
-    let scope = Scope::new();
+    let app = App::new();
     for init_fn in crate::STORE_REGISTRY {
-        init_fn(scope);
+        init_fn(app.clone());
     }
 }
 

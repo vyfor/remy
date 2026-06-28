@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use crate::handle::Init;
-use crate::scope::Scope;
+use crate::app::App;
 
 use super::{Resource, ResourceOpts, Retry};
 
@@ -38,7 +38,7 @@ where
     T: Send + Sync + Clone + 'static,
     E: Send + Sync + Clone + 'static,
 {
-    fn install(self, handle: &'static Resource<T, E>, _cx: Scope) {
+    fn install(self, handle: &'static Resource<T, E>, _cx: App) {
         handle.install_with(self.source, self.placeholder, self.options);
     }
 }

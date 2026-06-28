@@ -69,7 +69,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
                         });
 
                         slot_inits.push(quote! {
-                            ::remy::core::install(&#var_name, #init_expr, __cx);
+                            ::remy::core::install(&#var_name, #init_expr, __cx.clone());
                         });
                     } else if is_resource_type(&var_type) {
                         slot_declarations.push(quote! {
@@ -78,7 +78,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
                                 ::remy::core::Resource::uninit();
                         });
                         slot_inits.push(quote! {
-                            ::remy::core::install(&#var_name, #init_expr, __cx);
+                            ::remy::core::install(&#var_name, #init_expr, __cx.clone());
                         });
                     } else if is_query_type(&var_type) {
                         slot_declarations.push(quote! {
@@ -87,7 +87,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
                                 ::remy::core::Query::uninit();
                         });
                         slot_inits.push(quote! {
-                            ::remy::core::install(&#var_name, #init_expr, __cx);
+                            ::remy::core::install(&#var_name, #init_expr, __cx.clone());
                         });
                     } else if is_memo_type(&var_type) {
                         slot_declarations.push(quote! {
@@ -96,7 +96,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
                                 ::remy::core::Memo::uninit();
                         });
                         slot_inits.push(quote! {
-                            ::remy::core::install(&#var_name, #init_expr, __cx);
+                            ::remy::core::install(&#var_name, #init_expr, __cx.clone());
                         });
                     } else {
                         let var_name_str = var_name.to_string();
@@ -144,7 +144,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
         .map(|body| {
             quote! {
                 {
-                    let cx = ::remy::core::StoreCx::new(__cx, __store_owner());
+                    let app = ::remy::core::App::with_owner(__store_owner());
                     #body
                 }
             }
@@ -169,7 +169,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
         #(#slot_declarations)*
 
             #[doc(hidden)]
-            pub fn __init_store(__cx: ::remy::core::Scope) {
+            pub fn __init_store(__cx: ::remy::core::App) {
                 #(#slot_inits)*
                 #sync_init
             }
@@ -177,7 +177,7 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
             #[::remy::linkme::distributed_slice(::remy::core::STORE_REGISTRY)]
             #[linkme(crate = ::remy::linkme)]
             #[doc(hidden)]
-            static __STORE_REG: fn(::remy::core::Scope) = __init_store;
+            static __STORE_REG: fn(::remy::core::App) = __init_store;
         }
 
         #vis use #mod_name as #fn_name;

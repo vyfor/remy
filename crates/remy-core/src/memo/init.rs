@@ -1,5 +1,5 @@
 use crate::handle::Init;
-use crate::scope::Scope;
+use crate::app::App;
 
 use super::Memo;
 
@@ -24,7 +24,7 @@ where
     F: Fn() -> T + Send + Sync + 'static,
     T: Send + Sync + Clone + PartialEq + 'static,
 {
-    fn install(self, handle: &'static Memo<T>, _cx: Scope) {
+    fn install(self, handle: &'static Memo<T>, _cx: App) {
         handle.install(self.derive);
     }
 }

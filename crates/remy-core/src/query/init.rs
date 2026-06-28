@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use crate::handle::Init;
-use crate::scope::Scope;
+use crate::app::App;
 
 use super::{Query, QueryOpts};
 
@@ -42,7 +42,7 @@ where
     T: Send + Sync + Clone + 'static,
     E: Send + Sync + Clone + 'static,
 {
-    fn install(self, handle: &'static Query<K, T, E>, _cx: Scope) {
+    fn install(self, handle: &'static Query<K, T, E>, _cx: App) {
         handle.install(self.key_fn, self.fetch, self.placeholder, self.options);
     }
 }

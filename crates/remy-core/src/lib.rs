@@ -1,4 +1,5 @@
 pub mod bus;
+pub mod app;
 pub mod cached;
 pub mod cx;
 pub mod effect;
@@ -17,12 +18,12 @@ pub mod owner;
 pub mod query;
 pub mod resource;
 pub mod runtime;
-pub mod scope;
 pub mod state;
 pub mod tracking;
 pub mod transaction;
 pub mod view;
 
+pub use app::App;
 pub use cached::CachedView;
 pub use cx::{Cx, Rcx};
 pub use focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus};
@@ -38,13 +39,12 @@ pub use resource::{Refresh, Resource, ResourceOpts, Retry, resource};
 pub use runtime::{
     FocusId, LayerHandle, LayerId, frame_interval, set_frame_interval, set_frame_rate,
 };
-pub use scope::{Scope, StoreCx};
 pub use state::{SlotId, const_slot_id};
 pub use transaction::{Transaction, transaction};
 pub use view::View;
 
 #[linkme::distributed_slice]
-pub static STORE_REGISTRY: [fn(Scope)];
+pub static STORE_REGISTRY: [fn(App)];
 
 #[linkme::distributed_slice]
 pub static INTENT_REGISTRY: [(u32, bus::IntentFn)];

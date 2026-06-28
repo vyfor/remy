@@ -11,7 +11,7 @@ pub use remy_core::set_frame_interval;
 pub use remy_core::set_frame_rate;
 pub use remy_core::tracking::set_cursor_position;
 pub use remy_core::{
-    Cx, Memo, Query, Rcx, Resource, State,
+    App, Cx, Memo, Query, Rcx, Resource, State,
     effect::Effect,
     focus_builder::{FocusBuilder, FocusGroupBuilder, RenderFocus},
     framework::Framework,

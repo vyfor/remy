@@ -4,26 +4,25 @@ use std::time::Duration;
 
 use tokio::time::MissedTickBehavior;
 
+use crate::owner::Owner;
+
 mod globals;
-mod store;
 
 pub use globals::Globals;
-pub use store::StoreCx;
 
-#[derive(Clone, Copy)]
-pub struct Scope {
-    _private: (),
+#[derive(Clone, Default)]
+pub struct App {
+    owner: Option<Arc<Owner>>,
 }
 
-impl Default for Scope {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Scope {
+impl App {
     pub fn new() -> Self {
-        Self { _private: () }
+        Self { owner: None }
+    }
+
+    #[doc(hidden)]
+    pub fn with_owner(owner: Arc<Owner>) -> Self {
+        Self { owner: Some(owner) }
     }
 
     pub fn global<T: Send + Sync + Clone + 'static>(&self) -> T {
@@ -45,7 +44,12 @@ impl Scope {
     }
 
     pub fn spawn<F: Future<Output = ()> + Send + 'static>(&self, fut: F) {
-        tokio::spawn(fut);
+        match &self.owner {
+            Some(owner) => owner.spawn(fut),
+            None => {
+                tokio::spawn(fut);
+            }
+        }
     }
 
     pub fn interval<F>(&self, period: Duration, mut tick: F)
@@ -73,8 +77,13 @@ impl Scope {
     }
 
     pub fn effect(&self, callback: impl Fn() + Send + Sync + 'static) -> crate::effect::EffectId {
-        let id = crate::runtime::register_effect(callback);
-        crate::runtime::run_effect_by_id(id);
-        id
+        match &self.owner {
+            Some(owner) => owner.register_effect(callback),
+            None => {
+                let id = crate::runtime::register_effect(callback);
+                crate::runtime::run_effect_by_id(id);
+                id
+            }
+        }
     }
 }

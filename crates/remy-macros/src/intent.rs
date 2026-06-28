@@ -15,12 +15,12 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
     let body = &func.block;
 
     let mut user_params = Vec::new();
-    let mut has_scope = false;
+    let mut has_app = false;
 
     for (i, arg) in func.sig.inputs.iter().enumerate() {
         if let FnArg::Typed(pat_type) = arg {
-            if i == 0 && is_scope_param(pat_type) {
-                has_scope = true;
+            if i == 0 && is_app_param(pat_type) {
+                has_app = true;
                 continue;
             }
             user_params.push(pat_type.clone());
@@ -54,8 +54,8 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
     let struct_inits: Vec<_> = param_names.iter().map(|name| quote! { #name }).collect();
     let destructure: Vec<_> = param_names.iter().map(|name| quote! { #name }).collect();
 
-    let scope_binding = if has_scope {
-        quote! { let cx = ::remy::core::Scope::new(); }
+    let app_binding = if has_app {
+        quote! { let cx = ::remy::core::App::new(); }
     } else {
         quote! {}
     };
@@ -76,7 +76,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
     let executor_body = if is_async {
         if returns_result_unit {
             quote! {
-                #scope_binding
+                #app_binding
                 let fut = async move {
                     match async move { #body }.await {
                         Ok(()) => (),
@@ -94,7 +94,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
             }
         } else {
             quote! {
-                #scope_binding
+                #app_binding
                 let fut = async move {
                     #body
                 };
@@ -105,7 +105,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
         }
     } else if returns_result_unit {
         quote! {
-            #scope_binding
+            #app_binding
             ::remy::core::batch! {
                 let __result: () = match { #body } {
                     Ok(()) => (),
@@ -121,7 +121,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
         }
     } else {
         quote! {
-            #scope_binding
+            #app_binding
             ::remy::core::batch! { #body }
         }
     };
@@ -141,7 +141,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
 
         #[doc(hidden)]
         fn #execute_fn_name(
-            __cx: ::remy::core::Scope,
+            __cx: ::remy::core::App,
             __args: #args_struct_name,
         ) {
             let #args_struct_name { #(#destructure,)* } = __args;
@@ -160,7 +160,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
         #[linkme(crate = ::remy::linkme)]
         #[doc(hidden)]
         #[allow(non_upper_case_globals)]
-        static #reg_mod_name: (u32, fn(::remy::core::Scope, Box<dyn std::any::Any + Send>)) = (
+        static #reg_mod_name: (u32, fn(::remy::core::App, Box<dyn std::any::Any + Send>)) = (
             #intent_id_const,
             |cx, payload| {
                 let args = *payload.downcast::<#args_struct_name>().unwrap();
@@ -170,11 +170,11 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
     }
 }
 
-fn is_scope_param(pat_type: &syn::PatType) -> bool {
+fn is_app_param(pat_type: &syn::PatType) -> bool {
     if let Type::Path(type_path) = &*pat_type.ty
         && let Some(seg) = type_path.path.segments.last()
     {
-        return seg.ident == "Scope";
+        return seg.ident == "App";
     }
     false
 }

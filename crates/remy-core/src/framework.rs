@@ -20,7 +20,7 @@ use tokio::sync::mpsc;
 use crate::cx::Rcx;
 use crate::keyboard::{self, Chord, ChordPolicy, Flow, IntoFlow, Key, Keys};
 use crate::runtime;
-use crate::scope::Globals;
+use crate::app::Globals;
 use crate::view::View;
 
 pub struct Framework {
