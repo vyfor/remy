@@ -99,35 +99,13 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
                             ::remy::core::install(&#var_name, #init_expr, __cx.clone());
                         });
                     } else {
-                        let var_name_str = var_name.to_string();
-                        let slot_id_expr = quote! {
-                            ::remy::core::const_slot_id(
-                                concat!(module_path!(), "::", #mod_name_str),
-                                #var_name_str
+                        slot_declarations.push(
+                            syn::Error::new_spanned(
+                                &var_type,
+                                "store bindings must be State, Memo, Resource or Query",
                             )
-                        };
-                        let reg_static_name = quote::format_ident!("__SLOT_REG_{}", var_name);
-
-                        slot_declarations.push(quote! {
-                            #[allow(non_upper_case_globals)]
-                            pub static #var_name: ::remy::core::State<#var_type> =
-                                ::remy::core::State::new(#slot_id_expr);
-
-                            #[::remy::linkme::distributed_slice(::remy::core::SLOT_REGISTRY)]
-                            #[linkme(crate = ::remy::linkme)]
-                            #[doc(hidden)]
-                            #[allow(non_upper_case_globals)]
-                            static #reg_static_name: (&'static str, &'static str, ::remy::core::SlotId) = (
-                                concat!(module_path!(), "::", #mod_name_str),
-                                #var_name_str,
-                                #slot_id_expr,
-                            );
-                        });
-
-                        slot_inits.push(quote! {
-                            let __initial: #var_type = #init_expr;
-                            ::remy::core::runtime::allocate_slot(#var_name.id(), __initial);
-                        });
+                            .to_compile_error(),
+                        );
                     }
                 }
             }
