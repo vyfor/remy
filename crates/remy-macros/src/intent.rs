@@ -91,7 +91,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
                 };
                 ::remy::core::runtime::Runtime::get()
                     .executor
-                    .dispatch(#intent_id_const, fut);
+                    .dispatch(#intent_id_const.get().copied().unwrap(), fut);
             }
         } else {
             quote! {
@@ -101,7 +101,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
                 };
                 ::remy::core::runtime::Runtime::get()
                     .executor
-                    .dispatch(#intent_id_const, fut);
+                    .dispatch(#intent_id_const.get().copied().unwrap(), fut);
             }
         }
     } else if returns_result_unit {
@@ -134,10 +134,9 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
             #(#struct_fields,)*
         }
 
-        const #intent_id_const: u32 = ::remy::core::const_slot_id(
-            concat!(module_path!(), "::intent"),
-            #fn_name_str
-        );
+        #[doc(hidden)]
+        #[allow(non_upper_case_globals)]
+        static #intent_id_const: ::std::sync::OnceLock<u32> = ::std::sync::OnceLock::new();
 
         #[doc(hidden)]
         fn #execute_fn_name(
@@ -151,7 +150,7 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
         #vis fn #fn_name(#(#param_names: #param_types),*) {
             let __args = #args_struct_name { #(#struct_inits,)* };
             ::remy::core::runtime::dispatch_intent(
-                #intent_id_const,
+                &#intent_id_const,
                 Box::new(__args),
             );
         }
@@ -160,8 +159,8 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
         #[linkme(crate = ::remy::linkme)]
         #[doc(hidden)]
         #[allow(non_upper_case_globals)]
-        static #reg_mod_name: (u32, fn(::remy::core::App, Box<dyn std::any::Any + Send>)) = (
-            #intent_id_const,
+        static #reg_mod_name: (&'static ::std::sync::OnceLock<u32>, fn(::remy::core::App, Box<dyn std::any::Any + Send>)) = (
+            &#intent_id_const,
             |cx, payload| {
                 let args = *payload.downcast::<#args_struct_name>().unwrap();
                 #execute_fn_name(cx, args);

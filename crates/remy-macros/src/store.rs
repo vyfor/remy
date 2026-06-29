@@ -32,7 +32,6 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
     let vis = &func.vis;
     let fn_name = &func.sig.ident;
     let mod_name = quote::format_ident!("__store_{}", fn_name);
-    let mod_name_str = func.sig.ident.to_string();
 
     let mut slot_declarations = Vec::new();
     let mut slot_inits = Vec::new();
@@ -43,29 +42,17 @@ pub fn expand_store(input: TokenStream) -> TokenStream {
             Stmt::Local(local) => {
                 if let Some((var_name, var_type, init_expr)) = parse_let(local) {
                     if is_state_type(&var_type) {
-                        let var_name_str = var_name.to_string();
-                        let slot_id_expr = quote! {
-                            ::remy::core::const_slot_id(
-                                concat!(module_path!(), "::", #mod_name_str),
-                                #var_name_str
-                            )
-                        };
-                        let reg_static_name = quote::format_ident!("__SLOT_REG_{}", var_name);
+                        let slot_static_name = quote::format_ident!("__SLOT_{}", var_name);
 
                         slot_declarations.push(quote! {
-                            #[allow(non_upper_case_globals)]
-                            pub static #var_name: #var_type =
-                                <#var_type>::new(#slot_id_expr);
-
-                            #[::remy::linkme::distributed_slice(::remy::core::SLOT_REGISTRY)]
-                            #[linkme(crate = ::remy::linkme)]
                             #[doc(hidden)]
                             #[allow(non_upper_case_globals)]
-                            static #reg_static_name: (&'static str, &'static str, ::remy::core::SlotId) = (
-                                concat!(module_path!(), "::", #mod_name_str),
-                                #var_name_str,
-                                #slot_id_expr,
-                            );
+                            static #slot_static_name: ::std::sync::OnceLock<::remy::core::SlotId> =
+                                ::std::sync::OnceLock::new();
+
+                            #[allow(non_upper_case_globals)]
+                            pub static #var_name: #var_type =
+                                <#var_type>::new(&#slot_static_name);
                         });
 
                         slot_inits.push(quote! {

@@ -47,7 +47,7 @@ pub use view::View;
 pub static STORE_REGISTRY: [fn(App)];
 
 #[linkme::distributed_slice]
-pub static INTENT_REGISTRY: [(u32, bus::IntentFn)];
+pub static INTENT_REGISTRY: [(&'static std::sync::OnceLock<u32>, bus::IntentFn)];
 
 #[linkme::distributed_slice]
 pub static OWNER_REGISTRY: [&'static str];
