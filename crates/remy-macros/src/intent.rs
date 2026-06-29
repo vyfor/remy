@@ -128,7 +128,6 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
 
     quote! {
         #[doc(hidden)]
-        #[derive(Debug)]
         #[allow(non_camel_case_types)]
         struct #args_struct_name {
             #(#struct_fields,)*
