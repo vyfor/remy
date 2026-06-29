@@ -15,12 +15,14 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
     let body = &func.block;
 
     let mut user_params = Vec::new();
-    let mut has_app = false;
+    let mut app_ident = None;
 
     for (i, arg) in func.sig.inputs.iter().enumerate() {
         if let FnArg::Typed(pat_type) = arg {
             if i == 0 && is_app_param(pat_type) {
-                has_app = true;
+                if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                    app_ident = Some(pat_ident.ident.clone());
+                }
                 continue;
             }
             user_params.push(pat_type.clone());
@@ -54,10 +56,9 @@ pub fn expand_intent(input: TokenStream) -> TokenStream {
     let struct_inits: Vec<_> = param_names.iter().map(|name| quote! { #name }).collect();
     let destructure: Vec<_> = param_names.iter().map(|name| quote! { #name }).collect();
 
-    let app_binding = if has_app {
-        quote! { let cx = ::remy::core::App::new(); }
-    } else {
-        quote! {}
+    let app_binding = match &app_ident {
+        Some(ident) => quote! { let #ident = __cx; },
+        None => quote! {},
     };
 
     let returns_result_unit =
