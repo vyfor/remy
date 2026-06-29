@@ -166,9 +166,7 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
     let fn_name_str = fn_name.to_string();
     let existing_stmts = &func.block.stmts;
 
-    if !no_cache {
-        func.sig.output = syn::parse2(quote! { -> ::remy::Instance }).unwrap();
-    }
+    func.sig.output = syn::parse2(quote! { -> ::remy::Instance }).unwrap();
 
     let has_id = analysis.id_param.is_some();
     let prop_count = analysis.props.len();
@@ -194,7 +192,9 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
                 #cx_binding
                 let __res = { #(#existing_stmts)* };
                 ::std::mem::drop(__active_guard);
-                ::remy::core::CachedView::new(__owner_id, __res)
+                let __view: ::std::sync::Arc<dyn ::remy::View + ::std::marker::Send + ::std::marker::Sync> =
+                    ::std::sync::Arc::new(::remy::core::cached::CachedView::new(__owner_id, __res));
+                ::remy::Instance::__new_raw(__owner_id, __view)
             }
         }
     } else if !has_id && prop_count == 0 {
@@ -253,7 +253,7 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
                     )>,
                 > = ::std::sync::Mutex::new(None);
 
-                let __incoming_hash = ::remy::hash_props(&(#(#prop_names,)*));
+                let __incoming_hash = ::remy::hash_props(&(#(&#prop_names,)*));
 
                 let mut __cache = __SETUP.lock().unwrap();
 
@@ -298,17 +298,21 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
                     )
                 });
 
-                static __INSTANCES: ::std::sync::Mutex<
-                    ::std::collections::HashMap<
-                        ::remy::Id,
-                        (
-                            ::remy::core::tracking::OwnerId,
-                            ::std::sync::Arc<dyn ::remy::View + ::std::marker::Send + ::std::marker::Sync>,
-                        ),
+                static __INSTANCES: ::std::sync::LazyLock<
+                    ::std::sync::Mutex<
+                        ::std::collections::HashMap<
+                            ::remy::Id,
+                            (
+                                ::remy::core::tracking::OwnerId,
+                                ::std::sync::Arc<dyn ::remy::View + ::std::marker::Send + ::std::marker::Sync>,
+                            ),
+                        >,
                     >,
-                > = ::std::sync::Mutex::new(::std::collections::HashMap::new());
+                > = ::std::sync::LazyLock::new(|| {
+                    ::std::sync::Mutex::new(::std::collections::HashMap::new())
+                });
 
-                let __id: ::remy::Id = #id_name.into();
+                let __id: ::remy::Id = #id_name.clone().into();
                 let mut __instances = __INSTANCES.lock().unwrap();
 
                 if let ::std::option::Option::Some((__owner_id, __view)) = __instances.get(&__id) {
@@ -356,39 +360,44 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
                     )
                 });
 
-                static __INSTANCES: ::std::sync::Mutex<
-                    ::std::collections::HashMap<
-                        ::remy::Id,
-                        (
-                            ::remy::core::tracking::OwnerId,
-                            ::std::option::Option<(
-                                u64,
-                                ::std::sync::Arc<dyn ::remy::View + ::std::marker::Send + ::std::marker::Sync>,
-                            )>,
-                        ),
+                static __INSTANCES: ::std::sync::LazyLock<
+                    ::std::sync::Mutex<
+                        ::std::collections::HashMap<
+                            ::remy::Id,
+                            (
+                                ::remy::core::tracking::OwnerId,
+                                ::std::option::Option<(
+                                    u64,
+                                    ::std::sync::Arc<dyn ::remy::View + ::std::marker::Send + ::std::marker::Sync>,
+                                )>,
+                            ),
+                        >,
                     >,
-                > = ::std::sync::Mutex::new(::std::collections::HashMap::new());
+                > = ::std::sync::LazyLock::new(|| {
+                    ::std::sync::Mutex::new(::std::collections::HashMap::new())
+                });
 
-                let __id: ::remy::Id = #id_name.into();
-                let __incoming_hash = ::remy::hash_props(&(#(#prop_names,)*));
+                let __id: ::remy::Id = #id_name.clone().into();
+                let __incoming_hash = ::remy::hash_props(&(#(&#prop_names,)*));
 
                 let mut __instances = __INSTANCES.lock().unwrap();
 
-                let (__owner_id, __cached) = __instances
+                let (__owner_ref, __cached) = __instances
                     .entry(__id)
                     .or_insert_with(|| {
                         (::remy::core::runtime::spawn_owner(
                             concat!(module_path!(), "::", #fn_name_str)
                         ), None)
                     });
+                let __owner_id = *__owner_ref;
 
                 if let ::std::option::Option::Some((__cached_hash, __view)) = __cached {
                     if *__cached_hash == __incoming_hash {
-                        return ::remy::Instance::__new_raw(*__owner_id, ::std::sync::Arc::clone(__view));
+                        return ::remy::Instance::__new_raw(__owner_id, ::std::sync::Arc::clone(__view));
                     }
                 }
 
-                let __prev_active = ::remy::core::runtime::set_active_owner(Some(*__owner_id));
+                let __prev_active = ::remy::core::runtime::set_active_owner(Some(__owner_id));
                 struct __Guard(::std::option::Option<::remy::core::tracking::OwnerId>);
                 impl ::std::ops::Drop for __Guard {
                     fn drop(&mut self) {
@@ -404,11 +413,11 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
                 ::std::mem::drop(__active_guard);
 
                 let __view: ::std::sync::Arc<dyn ::remy::View + ::std::marker::Send + ::std::marker::Sync> =
-                    ::std::sync::Arc::new(::remy::core::cached::CachedView::new(*__owner_id, __res));
+                    ::std::sync::Arc::new(::remy::core::cached::CachedView::new(__owner_id, __res));
 
                 *__cached = ::std::option::Option::Some((__incoming_hash, ::std::sync::Arc::clone(&__view)));
 
-                ::remy::Instance::__new_raw(*__owner_id, __view)
+                ::remy::Instance::__new_raw(__owner_id, __view)
             }
         }
     };
