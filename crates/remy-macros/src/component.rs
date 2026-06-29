@@ -8,7 +8,7 @@ enum CxKind {
     MutRef,
 }
 
-fn cx_type(ty: &Type) -> Option<CxKind> {
+fn cx_kind(ty: &Type) -> Option<CxKind> {
     match ty {
         Type::Path(path) if is_ident(&path.path, "Cx") => Some(CxKind::Value),
         Type::Reference(reference) => match reference.elem.as_ref() {
@@ -31,13 +31,54 @@ fn is_ident(path: &Path, ident: &str) -> bool {
         .is_some_and(|segment| segment.ident == ident)
 }
 
+fn is_id_type(ty: &Type) -> bool {
+    match ty {
+        Type::Path(path) => is_ident(&path.path, "Id"),
+        Type::ImplTrait(impl_trait) => impl_trait.bounds.iter().any(|bound| {
+            let syn::TypeParamBound::Trait(tr) = bound else {
+                return false;
+            };
+            let Some(seg) = tr.path.segments.last() else {
+                return false;
+            };
+            if seg.ident != "Into" {
+                return false;
+            }
+            let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
+                return false;
+            };
+            matches!(
+                args.args.first(),
+                Some(syn::GenericArgument::Type(Type::Path(p))) if is_ident(&p.path, "Id")
+            )
+        }),
+        _ => false,
+    }
+}
+
+fn make_cx_binding(name: &Ident, kind: CxKind) -> TokenStream {
+    match kind {
+        CxKind::Value => quote! {
+            let #name = ::remy::Cx::new(__owner_id);
+        },
+        CxKind::Ref => quote! {
+            let __remy_owner_cx = ::remy::Cx::new(__owner_id);
+            let #name = &__remy_owner_cx;
+        },
+        CxKind::MutRef => quote! {
+            let mut __remy_owner_cx = ::remy::Cx::new(__owner_id);
+            let #name = &mut __remy_owner_cx;
+        },
+    }
+}
+
 struct ParamAnalysis {
     cx_binding: Option<TokenStream>,
     id_param: Option<(Ident, Type)>,
     props: Vec<(Ident, Type)>,
 }
 
-fn analyze_params(func: &mut ItemFn) -> ParamAnalysis {
+fn analyze_params(func: &mut ItemFn) -> Result<ParamAnalysis, syn::Error> {
     let mut cx_binding = None;
     let mut id_param = None;
     let mut props = Vec::new();
@@ -45,7 +86,7 @@ fn analyze_params(func: &mut ItemFn) -> ParamAnalysis {
     let inputs = std::mem::take(&mut func.sig.inputs);
     let mut kept_inputs = syn::punctuated::Punctuated::new();
 
-    for arg in inputs {
+    for (index, arg) in inputs.into_iter().enumerate() {
         let FnArg::Typed(pat_type) = &arg else {
             kept_inputs.push(arg);
             continue;
@@ -55,55 +96,42 @@ fn analyze_params(func: &mut ItemFn) -> ParamAnalysis {
             kept_inputs.push(arg);
             continue;
         };
-        let name = &pat_ident.ident;
+        let name = pat_ident.ident.clone();
 
-        if let Some(cx_kind) = cx_type(&pat_type.ty) {
-            cx_binding = Some(match cx_kind {
-                CxKind::Value => quote! {
-                    let #name = ::remy::Cx::new(__owner_id);
-                },
-                CxKind::Ref => quote! {
-                    let __remy_owner_cx = ::remy::Cx::new(__owner_id);
-                    let #name = &__remy_owner_cx;
-                },
-                CxKind::MutRef => quote! {
-                    let mut __remy_owner_cx = ::remy::Cx::new(__owner_id);
-                    let #name = &mut __remy_owner_cx;
-                },
-            });
+        if let Some(kind) = cx_kind(&pat_type.ty) {
+            if index != 0 {
+                return Err(syn::Error::new_spanned(
+                    &arg,
+                    "Cx must be the first parameter",
+                ));
+            }
+            cx_binding = Some(make_cx_binding(&name, kind));
             continue;
         }
 
-        let is_id = match &*pat_type.ty {
-            Type::Path(path) => is_ident(&path.path, "Id"),
-            Type::ImplTrait(impl_trait) => impl_trait.bounds.iter().any(|b| {
-                if let syn::TypeParamBound::Trait(tr) = b {
-                    let path = &tr.path;
-                    path.segments.last().is_some_and(|seg| seg.ident == "Into")
-                } else {
-                    false
-                }
-            }),
-            _ => false,
-        };
-
-        if is_id {
-            id_param = Some((name.clone(), (*pat_type.ty).clone()));
+        if is_id_type(&pat_type.ty) {
+            if id_param.is_some() {
+                return Err(syn::Error::new_spanned(
+                    &arg,
+                    "component takes one Id at most",
+                ));
+            }
+            id_param = Some((name, (*pat_type.ty).clone()));
             kept_inputs.push(arg);
             continue;
         }
 
-        props.push((name.clone(), (*pat_type.ty).clone()));
+        props.push((name, (*pat_type.ty).clone()));
         kept_inputs.push(arg);
     }
 
     func.sig.inputs = kept_inputs;
 
-    ParamAnalysis {
+    Ok(ParamAnalysis {
         cx_binding,
         id_param,
         props,
-    }
+    })
 }
 
 pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
@@ -124,7 +152,10 @@ pub fn expand_component(attr: TokenStream, input: TokenStream) -> TokenStream {
         Err(e) => return e.to_compile_error(),
     };
 
-    let analysis = analyze_params(&mut func);
+    let analysis = match analyze_params(&mut func) {
+        Ok(a) => a,
+        Err(e) => return e.to_compile_error(),
+    };
     let cx_binding = analysis.cx_binding.unwrap_or_else(|| {
         quote! {
             let cx = ::remy::Cx::new(__owner_id);
