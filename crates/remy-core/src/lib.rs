@@ -39,7 +39,7 @@ pub use resource::{Refresh, Resource, ResourceOpts, Retry, resource};
 pub use runtime::{
     FocusId, LayerHandle, LayerId, frame_interval, set_frame_interval, set_frame_rate,
 };
-pub use state::{SlotId, const_slot_id};
+pub use state::SlotId;
 pub use transaction::{Transaction, transaction};
 pub use view::View;
 
@@ -51,30 +51,6 @@ pub static INTENT_REGISTRY: [(&'static std::sync::OnceLock<u32>, bus::IntentFn)]
 
 #[linkme::distributed_slice]
 pub static OWNER_REGISTRY: [&'static str];
-
-#[linkme::distributed_slice]
-pub static SLOT_REGISTRY: [(&'static str, &'static str, state::SlotId)];
-
-pub fn check_slot_collisions() {
-    use std::collections::HashMap;
-    let mut seen: HashMap<state::SlotId, (&str, &str)> = HashMap::new();
-    for &(module_path, var_name, slot_id) in SLOT_REGISTRY {
-        match seen.entry(slot_id) {
-            std::collections::hash_map::Entry::Vacant(e) => {
-                e.insert((module_path, var_name));
-            }
-            std::collections::hash_map::Entry::Occupied(e) => {
-                let (prev_module, prev_var) = *e.get();
-                if prev_module != module_path || prev_var != var_name {
-                    // todo: revisit later
-                    panic!(
-                        "id collision between `{prev_module}::{prev_var}` and `{module_path}::{var_name}`"
-                    );
-                }
-            }
-        }
-    }
-}
 
 #[macro_export]
 macro_rules! batch {

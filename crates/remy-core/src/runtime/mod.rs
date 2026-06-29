@@ -170,7 +170,6 @@ fn init_stores() {
         return;
     }
 
-    crate::check_slot_collisions();
     let app = App::new();
     for init_fn in crate::STORE_REGISTRY {
         init_fn(app.clone());
