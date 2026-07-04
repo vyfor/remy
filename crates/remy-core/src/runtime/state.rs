@@ -61,14 +61,16 @@ pub fn apply_commits() -> Vec<SlotId> {
     let rt = Runtime::get();
     let commits = rt.commits.drain();
 
+    let mut touched = Vec::with_capacity(commits.len());
     for commit in commits {
+        touched.push(commit.slot_id);
         match commit.op {
             Op::Set(value) => rt.state.write_pending_raw(commit.slot_id, value),
             Op::Update(update) => update(&rt.state, commit.slot_id),
         }
     }
 
-    let dirty_slots = rt.state.commit_all();
+    let dirty_slots = rt.state.commit(&touched);
     rt.effects.run_slots(&dirty_slots);
     let mut pending = rt.pending_dirty.lock().unwrap();
     pending.extend(dirty_slots);

@@ -40,10 +40,6 @@ fn bucket_len(bucket: usize) -> usize {
     1 << (bucket + FIRST_BITS as usize)
 }
 
-fn bucket_base(bucket: usize) -> SlotId {
-    ((1u64 << (bucket as u32 + FIRST_BITS)) - FIRST_LEN) as SlotId
-}
-
 pub struct Slots {
     buckets: [AtomicPtr<AtomicPtr<Slot>>; BUCKETS],
 }
@@ -165,26 +161,15 @@ impl Slots {
         slot.dirty.store(true, Ordering::Release);
     }
 
-    pub fn commit_all(&self) -> Vec<SlotId> {
+    pub fn commit(&self, touched: &[SlotId]) -> Vec<SlotId> {
         let mut committed = Vec::new();
-        for bucket in 0..BUCKETS {
-            let array = self.buckets[bucket].load(Ordering::Acquire);
-            if array.is_null() {
-                break;
-            }
-            let base = bucket_base(bucket);
-            for offset in 0..bucket_len(bucket) {
-                let slot = unsafe { &*array.add(offset) }.load(Ordering::Acquire);
-                if slot.is_null() {
-                    continue;
+        for &slot_id in touched {
+            let slot = self.slot(slot_id);
+            if slot.dirty.swap(false, Ordering::AcqRel) {
+                unsafe {
+                    ptr::swap(slot.current.get(), slot.pending.get());
                 }
-                let slot = unsafe { &*slot };
-                if slot.dirty.swap(false, Ordering::AcqRel) {
-                    unsafe {
-                        ptr::swap(slot.current.get(), slot.pending.get());
-                    }
-                    committed.push(base + offset as SlotId);
-                }
+                committed.push(slot_id);
             }
         }
         committed
