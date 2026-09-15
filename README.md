@@ -1,3 +1,6 @@
+> [!WARNING]
+> deprecated in favor of https://github.com/vyfor/kursor.
+
 # 🐀 remy
 
 remy is an opinionated, reactive framework for **[ratatui](https://ratatui.rs)** -- a rust crate for cooking up terminal user interfaces. remy is a work in progress.
